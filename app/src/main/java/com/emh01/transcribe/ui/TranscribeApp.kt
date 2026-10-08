@@ -379,11 +379,26 @@ private fun ResultContent(
         )
 
         AnimatedVisibility(visible = state.processingMs > 0) {
-            Text(
-                text = "Procesado en %.1f s".format(state.processingMs / 1000f),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = "Audio %.1f s · Procesado en %.1f s · RTF %.1f×".format(
+                        state.originalAudioMs / 1000f,
+                        state.processingMs / 1000f,
+                        state.realtimeFactor,
+                    ),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (state.processedAudioMs in 1 until state.originalAudioMs) {
+                    Text(
+                        text = "Voz útil: %.1f s después de recortar silencios".format(
+                            state.processedAudioMs / 1000f,
+                        ),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
 
         Row(
