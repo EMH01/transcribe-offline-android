@@ -1,3 +1,6 @@
+import java.net.URI
+import java.security.MessageDigest
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -66,7 +69,7 @@ dependencies {
 }
 
 fun sha256(file: File): String {
-    val digest = java.security.MessageDigest.getInstance("SHA-256")
+    val digest = MessageDigest.getInstance("SHA-256")
     file.inputStream().buffered().use { input ->
         val buffer = ByteArray(64 * 1024)
         while (true) {
@@ -98,7 +101,7 @@ tasks.register("prepareWhisperModel") {
             if (whisperModel.exists()) whisperModel.delete()
             logger.lifecycle("Downloading Whisper Tiny Q5_1 (about 32 MB)…")
 
-            val connection = java.net.URI.create(whisperModelUrl).toURL().openConnection().apply {
+            val connection = URI.create(whisperModelUrl).toURL().openConnection().apply {
                 connectTimeout = 30_000
                 readTimeout = 120_000
                 setRequestProperty("User-Agent", "transcribe-offline-android-build")
