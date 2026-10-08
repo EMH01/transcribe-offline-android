@@ -1,25 +1,74 @@
 # Transcribe Offline Android
 
-A lightweight Android dictation app designed to work **fully offline at runtime** on older/low-end phones. The app records 16 kHz mono PCM audio and transcribes Spanish locally with **Whisper Tiny multilingual Q5_1** through `whisper.cpp`.
+**Transcribe Offline Android** is a lightweight, privacy-first speech-to-text application designed to run **entirely on-device**.
 
-## Goals
+It is intended for people and environments where reliable access to cloud AI cannot be assumed: intermittent or expensive connectivity, slow networks, older hardware, limited infrastructure, or regions and networks where modern online services are unavailable or restricted.
 
-- Beautiful, friendly, lightweight and intuitive UI.
-- One obvious flow: **record → stop → read/edit → copy/share**.
-- No account, API key, cloud service or runtime Internet access.
-- Spanish transcription on-device.
-- Reusable architecture for a future local LLM assistant.
+The app records speech locally and transcribes it with **Whisper Tiny multilingual Q5_1** through `whisper.cpp`. Once installed, it requires **no account, API key, server, cloud service, or Internet connection** to perform transcription.
+
+## Why this project exists
+
+Speech-to-text has become a common capability in modern AI products, but many implementations assume fast, continuous and unrestricted Internet access. That assumption excludes users for whom connectivity is unreliable, costly, slow, or simply unavailable.
+
+This project explores a different baseline:
+
+> useful voice transcription should remain available even when the network is not.
+
+The goal is not to reproduce a large cloud AI stack on a low-end phone. It is to provide a focused, understandable and practical tool that works locally, respects device constraints, and remains usable in offline-first scenarios.
+
+## Design principles
+
+- **Offline by default** — runtime transcription never leaves the device.
+- **Low dependency footprint** — no login, backend, analytics service or runtime API.
+- **Lightweight UX** — one primary flow: **record → stop → read/edit → copy/share**.
+- **Older-device aware** — ARM64 and ARMv7 builds, conservative UI, small quantized model.
+- **Transparent performance** — the app shows audio duration, processing time and real-time factor (RTF).
+- **Modular architecture** — the speech stack can later be reused by a fully local LLM assistant.
+- **Reproducible builds** — the model and `whisper.cpp` revision are pinned and verified.
+
+## Current version: 0.2.1
+
+The application already has a working end-to-end offline pipeline:
+
+```text
+Microphone
+    ↓
+16 kHz mono PCM
+    ↓
+lightweight voice/silence trimming
+    ↓
+Whisper Tiny Q5_1
+    ↓
+editable transcription
+    ↓
+copy / share
+```
+
+Version **0.2.1** adds the first performance and reliability pass over the working baseline:
+
+- lightweight energy-based voice activity trimming before inference;
+- leading and trailing silence removal to avoid wasting CPU time;
+- deterministic Whisper decoding (`temperature = 0`);
+- blank and non-speech token suppression;
+- stricter no-speech handling to reduce hallucinations on silence;
+- visible audio duration, inference time and RTF;
+- custom adaptive launcher icon;
+- release-signing support for stable Android app identity.
+
+These changes are designed to improve both **latency** and **transcription stability** on constrained phones. Actual speed still depends heavily on the device CPU, so performance should be measured on the intended hardware rather than assumed from desktop benchmarks.
 
 ## Architecture
 
 ```text
 :app
-  ├── Compose / Material 3 UI
+  ├── Jetpack Compose / Material 3 UI
   ├── TranscribeViewModel
-  └── model asset (packaged in APK)
+  └── packaged Whisper model
        │
        ├── :core-audio
-       │     └── AudioRecord → FloatArray PCM 16 kHz mono
+       │     ├── AudioRecord
+       │     ├── PCM 16 kHz mono
+       │     └── lightweight voice activity trimming
        │
        ├── :core-speech
        │     └── SpeechToTextEngine contract
@@ -27,72 +76,142 @@ A lightweight Android dictation app designed to work **fully offline at runtime*
        └── :core-whisper
              ├── WhisperTinyEngine
              ├── JNI bridge
-             └── whisper.cpp (pinned build dependency)
+             └── whisper.cpp
 ```
 
-The UI only talks to the speech engine abstraction. A future app can reuse `core-audio`, `core-speech` and `core-whisper` and add a `core-llm` module without rewriting the transcription stack.
+The UI does not depend directly on Whisper. It talks to the `SpeechToTextEngine` abstraction, which keeps the application replaceable and reusable.
+
+That separation is intentional: a future local assistant can reuse `core-audio`, `core-speech` and `core-whisper`, then add a `core-llm` module without rewriting the speech pipeline.
 
 ## Offline behavior
 
-The Android manifest intentionally contains **no `INTERNET` permission**. Once the APK is built and installed, model loading and inference happen locally.
+The Android manifest intentionally contains **no `INTERNET` permission**.
 
-The development machine does need Internet once during a clean build for two build-time dependencies:
+At build time, the development machine downloads two pinned dependencies:
 
-1. CMake fetches a pinned `whisper.cpp` source commit.
-2. `:app:prepareWhisperModel` downloads and SHA-256 verifies `ggml-tiny-q5_1.bin` (~32 MB), then packages it under `assets/models/`.
+1. the selected `whisper.cpp` source revision;
+2. `ggml-tiny-q5_1.bin`, whose SHA-256 is verified before packaging.
 
-After installation, put the phone in airplane mode: recording and transcription continue to work.
+The final APK contains the model and native inference code. On the phone, transcription is therefore local and remains available in airplane mode.
 
 ## Model
 
-- Model: `ggml-tiny-q5_1.bin`
-- Type: Whisper Tiny multilingual, Q5_1 quantized
-- Approximate size: 32 MB
-- SHA-256: `818710568da3ca15689e31a743197b520007872ff9576237bda97bd1b469c3d7`
-- Runtime language: `es`
+- **Model:** `ggml-tiny-q5_1.bin`
+- **Family:** Whisper Tiny multilingual
+- **Quantization:** Q5_1
+- **Approximate model size:** 32 MB
+- **Runtime language:** Spanish (`es`)
+- **SHA-256:** `818710568da3ca15689e31a743197b520007872ff9576237bda97bd1b469c3d7`
 
-The binary is not committed to Git. Gradle downloads and verifies it before `preBuild`, then includes it in the APK.
+The model binary is not committed to Git. Gradle downloads and verifies it before packaging it under `assets/models/`.
+
+## Performance measurement
+
+On-device inference speed varies substantially across CPUs. Instead of hiding that, the app exposes:
+
+- recorded audio duration;
+- voice duration after silence trimming;
+- inference time;
+- **RTF (real-time factor)**.
+
+```text
+RTF = inference time / processed audio duration
+```
+
+Examples:
+
+- `RTF < 1.0` → faster than real time;
+- `RTF = 1.0` → one second of compute per second of audio;
+- `RTF > 1.0` → slower than real time.
+
+This makes performance work measurable rather than subjective.
+
+## Android compatibility
+
+- **Minimum Android:** 8.0 / API 26
+- **Native ABIs:** `arm64-v8a`, `armeabi-v7a`
+- **Audio input:** 16-bit PCM, mono, 16 kHz
+- Whisper inference runs on a dedicated background thread so the Compose UI remains responsive.
+
+## User experience
+
+The interface is intentionally small and direct:
+
+- large primary recording action;
+- clear recording state and timer;
+- lightweight audio-level visualization;
+- explicit processing state;
+- editable transcription result;
+- copy and share actions;
+- light and dark Material 3 themes;
+- adaptive Android launcher icon.
+
+The goal is that a first-time user should be able to operate the app without instructions.
 
 ## Build
 
 Requirements:
 
-- Android Studio with JDK 17+
+- Android Studio / JDK 17+
 - Android SDK 35
-- Android NDK + CMake 3.22.1
-- Git available to CMake for the pinned `whisper.cpp` fetch
+- Android NDK
+- CMake 3.22.1
+- Git available during the first native build
 
-Open the project and build normally, or run:
+Debug build:
 
 ```bash
 ./gradlew :app:assembleDebug
 ```
 
-The first clean build downloads the model and `whisper.cpp`. Subsequent builds reuse local build caches and the already downloaded model.
+Release build:
 
-## Device compatibility
+```bash
+./gradlew :app:assembleRelease
+```
 
-- Minimum Android: 8.0 / API 26
-- Native ABIs: `arm64-v8a`, `armeabi-v7a`
-- Audio: mono, PCM 16-bit, 16 kHz
-- Whisper inference is serialized onto a dedicated background thread so the Compose UI remains responsive.
+For real-device distribution, use a **stable signed release APK**, not the debug build. Release signing is configured locally so the private signing key never needs to be committed to the public repository.
 
-## Current scope
+See [RELEASE_SIGNING.md](RELEASE_SIGNING.md).
 
-Implemented in this version:
+## Project background
 
-- microphone permission flow;
-- local PCM capture;
-- lightweight recording level visualization;
-- timer and clear recording state;
-- Whisper Tiny Q5_1 local inference;
-- editable result;
-- copy/share;
-- light/dark Material 3 UI;
-- no runtime Internet permission.
+This project is also an experiment in **AI-assisted engineering across domain boundaries**.
 
-Planned later: local history, longer-recording optimizations, benchmarks on the target Xiaomi, and the separate local-LLM assistant app.
+Its author works primarily in **Python and Data Science rather than native Android development**. The project deliberately uses modern AI-assisted development to extend into an unfamiliar stack—Kotlin, Jetpack Compose, JNI, NDK and C++—while keeping the engineering process grounded in reproducible builds, device testing, explicit benchmarks and inspectable architecture.
 
-## Third-party
+The objective is not to present AI-generated code as expertise by itself. It is to explore how strong problem decomposition, validation and existing software/data skills can make new technical domains practically accessible.
 
-`whisper.cpp` is developed by Georgi Gerganov and contributors and is used under its MIT license. See `THIRD_PARTY_NOTICES.md`.
+## Roadmap
+
+Near-term work:
+
+- benchmark 0.2.1 on older Android hardware;
+- tune thread count per CPU class;
+- refine silence detection thresholds from real recordings;
+- improve long-recording behavior;
+- add local transcription history.
+
+Future direction:
+
+```text
+Microphone
+    ↓
+Whisper
+    ↓
+local text
+    ↓
+small local LLM
+    ↓
+assistant response
+    ↓
+optional local TTS
+```
+
+The long-term goal is to reuse the offline speech stack as the input layer for a small, fully local AI assistant.
+
+## Third-party software
+
+`whisper.cpp` is developed by Georgi Gerganov and contributors and is used under its MIT license.
+
+See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for details.
