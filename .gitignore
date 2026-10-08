@@ -1,0 +1,13 @@
+*.iml
+.gradle/
+/local.properties
+/.idea/
+.DS_Store
+/build/
+**/build/
+.cxx/
+.externalNativeBuild/
+
+# The model is fetched and bundled at build time; do not commit the 32 MB binary.
+app/src/main/assets/models/*.bin
+!app/src/main/assets/models/.gitkeep
