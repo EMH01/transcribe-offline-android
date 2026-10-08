@@ -11,3 +11,8 @@
 # The model is fetched and bundled at build time; do not commit the 32 MB binary.
 app/src/main/assets/models/*.bin
 !app/src/main/assets/models/.gitkeep
+
+# Release signing identity: never commit private keys or passwords.
+keystore.properties
+*.jks
+*.keystore
