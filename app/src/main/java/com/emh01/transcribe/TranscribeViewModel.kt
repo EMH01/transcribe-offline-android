@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.emh01.transcribe.audio.PcmAudioRecorder
+import com.emh01.transcribe.audio.VoiceActivityTrimmer
 import com.emh01.transcribe.whisper.WhisperTinyEngine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -51,12 +52,24 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
             runCatching {
                 val samples = recorder.stop()
                 require(samples.isNotEmpty()) { "No se detectó audio." }
-                speechEngine.transcribe(samples = samples, language = "es")
-            }.onSuccess { result ->
+
+                val prepared = VoiceActivityTrimmer.prepare(samples)
+                require(prepared.samples.isNotEmpty()) {
+                    "No se detectó voz suficiente. Acércate un poco al micrófono y vuelve a intentarlo."
+                }
+
+                val result = speechEngine.transcribe(
+                    samples = prepared.samples,
+                    language = "es",
+                )
+                result to prepared
+            }.onSuccess { (result, prepared) ->
                 _uiState.value = TranscribeUiState(
                     stage = TranscribeStage.Result,
                     text = result.text,
                     processingMs = result.elapsedMs,
+                    originalAudioMs = prepared.originalDurationMs,
+                    processedAudioMs = prepared.processedDurationMs,
                 )
             }.onFailure { error ->
                 _uiState.value = TranscribeUiState(
@@ -102,5 +115,10 @@ data class TranscribeUiState(
     val text: String = "",
     val amplitude: Float = 0f,
     val processingMs: Long = 0L,
+    val originalAudioMs: Long = 0L,
+    val processedAudioMs: Long = 0L,
     val errorMessage: String? = null,
-)
+) {
+    val realtimeFactor: Float
+        get() = if (processedAudioMs > 0) processingMs.toFloat() / processedAudioMs else 0f
+}
