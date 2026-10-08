@@ -1,0 +1,46 @@
+# Changelog
+
+All notable changes to **Transcribe Offline Android** are documented here.
+
+## 0.2.1 — Stable baseline
+
+Status: **validated on real Android hardware**
+
+### Added
+
+- Fully local Whisper Tiny multilingual Q5_1 inference.
+- Lightweight energy-based voice activity trimming before transcription.
+- Visible audio duration, useful-voice duration, processing time and real-time factor (RTF).
+- Adaptive launcher icon with modern Android monochrome support.
+- Stable release-signing configuration kept outside the public repository.
+- Professional project documentation focused on offline-first accessibility.
+
+### Improved
+
+- Leading and trailing silence are removed before inference to reduce unnecessary CPU work.
+- Whisper decoding is deterministic with `temperature = 0`.
+- Blank and non-speech tokens are suppressed more aggressively.
+- No-speech handling is stricter to reduce hallucinations during silence.
+- Native `whisper.cpp` code is optimized in Release builds.
+- The inference engine remains isolated from the UI through `SpeechToTextEngine`.
+
+### Distribution
+
+The stable application identity uses a long-lived signing certificate.
+
+Certificate SHA-256:
+
+```text
+F8:45:DB:90:80:06:0A:59:9D:80:00:99:34:52:93:D7:4C:7E:C4:24:51:49:E5:18:C8:43:0E:0D:AC:B4:B6:E0
+```
+
+Future stable APKs must use the same private signing key to install as updates over this version.
+
+## 0.2.0 — First working offline build
+
+- End-to-end microphone → local Whisper → editable text flow.
+- Whisper Tiny Q5_1 bundled into the APK.
+- Jetpack Compose / Material 3 interface.
+- Copy and share actions.
+- No runtime Internet permission.
+- ARM64 and ARMv7 native support.
