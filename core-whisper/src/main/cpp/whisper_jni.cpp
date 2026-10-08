@@ -99,7 +99,18 @@ Java_com_emh01_transcribe_whisper_WhisperNative_transcribe(
     params.n_threads = std::max(1, static_cast<int>(threadCount));
     params.offset_ms = 0;
     params.no_context = true;
+    params.no_timestamps = true;
     params.single_segment = false;
+
+    // Tiny models are prone to continuing into silence. Keep decoding
+    // deterministic and suppress non-speech/blank tokens aggressively.
+    params.suppress_blank = true;
+    params.suppress_nst = true;
+    params.temperature = 0.0f;
+    params.temperature_inc = 0.0f;
+    params.no_speech_thold = 0.50f;
+    params.logprob_thold = -1.0f;
+    params.entropy_thold = 2.4f;
 
     whisper_reset_timings(context);
     const int result = whisper_full(context, params, samples, sampleCount);
