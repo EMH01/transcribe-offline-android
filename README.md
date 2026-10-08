@@ -26,9 +26,9 @@ The goal is not to reproduce a large cloud AI stack on a low-end phone. It is to
 - **Modular architecture** — the speech stack can later be reused by a fully local LLM assistant.
 - **Reproducible builds** — the model and `whisper.cpp` revision are pinned and verified.
 
-## Current version: 0.2.1
+## Stable baseline: 0.2.1
 
-The application already has a working end-to-end offline pipeline:
+The application has a working end-to-end offline pipeline that has been validated on real Android hardware:
 
 ```text
 Microphone
@@ -55,7 +55,7 @@ Version **0.2.1** adds the first performance and reliability pass over the worki
 - custom adaptive launcher icon;
 - release-signing support for stable Android app identity.
 
-These changes are designed to improve both **latency** and **transcription stability** on constrained phones. Actual speed still depends heavily on the device CPU, so performance should be measured on the intended hardware rather than assumed from desktop benchmarks.
+These changes improve both **latency** and **transcription stability** on constrained phones. Version 0.2.1 has been validated as a functional release baseline on real hardware; inference speed still depends heavily on the device CPU, so the app exposes its own performance metrics instead of relying on desktop benchmarks.
 
 ## Architecture
 
@@ -172,6 +172,14 @@ Release build:
 
 For real-device distribution, use a **stable signed release APK**, not the debug build. Release signing is configured locally so the private signing key never needs to be committed to the public repository.
 
+The stable application identity uses a long-lived RSA signing certificate. Its SHA-256 certificate fingerprint is:
+
+```text
+F8:45:DB:90:80:06:0A:59:9D:80:00:99:34:52:93:D7:4C:7E:C4:24:51:49:E5:18:C8:43:0E:0D:AC:B4:B6:E0
+```
+
+Future stable APKs must be signed with the same private key so Android can install them as updates over the existing app.
+
 See [RELEASE_SIGNING.md](RELEASE_SIGNING.md).
 
 ## Project background
@@ -186,7 +194,7 @@ The objective is not to present AI-generated code as expertise by itself. It is 
 
 Near-term work:
 
-- benchmark 0.2.1 on older Android hardware;
+- expand benchmarks across older Android hardware;
 - tune thread count per CPU class;
 - refine silence detection thresholds from real recordings;
 - improve long-recording behavior;
