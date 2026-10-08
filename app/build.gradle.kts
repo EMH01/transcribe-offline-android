@@ -1,0 +1,123 @@
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
+}
+
+android {
+    namespace = "com.emh01.transcribe"
+    compileSdk = 35
+
+    defaultConfig {
+        applicationId = "com.emh01.transcribeoffline"
+        minSdk = 26
+        targetSdk = 35
+        versionCode = 2
+        versionName = "0.2.0"
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+        }
+    }
+
+    buildFeatures {
+        compose = true
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+}
+
+dependencies {
+    implementation(project(":core-audio"))
+    implementation(project(":core-speech"))
+    implementation(project(":core-whisper"))
+
+    implementation("androidx.core:core-ktx:1.15.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
+    implementation("androidx.activity:activity-compose:1.10.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+
+    implementation(platform("androidx.compose:compose-bom:2024.12.01"))
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.compose.animation:animation")
+    implementation("androidx.compose.material3:material3")
+
+    debugImplementation("androidx.compose.ui:ui-tooling")
+}
+
+fun sha256(file: File): String {
+    val digest = java.security.MessageDigest.getInstance("SHA-256")
+    file.inputStream().buffered().use { input ->
+        val buffer = ByteArray(64 * 1024)
+        while (true) {
+            val read = input.read(buffer)
+            if (read <= 0) break
+            digest.update(buffer, 0, read)
+        }
+    }
+    return digest.digest().joinToString("") { "%02x".format(it) }
+}
+
+val whisperModelUrl =
+    "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny-q5_1.bin?download=true"
+val whisperModelSha256 =
+    "818710568da3ca15689e31a743197b520007872ff9576237bda97bd1b469c3d7"
+val whisperModel = layout.projectDirectory.file(
+    "src/main/assets/models/ggml-tiny-q5_1.bin",
+).asFile
+
+tasks.register("prepareWhisperModel") {
+    group = "whisper"
+    description = "Downloads and verifies Whisper Tiny Q5_1 for packaging in the APK."
+
+    doLast {
+        whisperModel.parentFile.mkdirs()
+
+        val currentHash = if (whisperModel.exists()) sha256(whisperModel) else null
+        if (currentHash != whisperModelSha256) {
+            if (whisperModel.exists()) whisperModel.delete()
+            logger.lifecycle("Downloading Whisper Tiny Q5_1 (about 32 MB)…")
+
+            val connection = java.net.URI.create(whisperModelUrl).toURL().openConnection().apply {
+                connectTimeout = 30_000
+                readTimeout = 120_000
+                setRequestProperty("User-Agent", "transcribe-offline-android-build")
+            }
+            connection.getInputStream().buffered().use { input ->
+                whisperModel.outputStream().buffered().use { output ->
+                    input.copyTo(output)
+                }
+            }
+        }
+
+        val verifiedHash = sha256(whisperModel)
+        check(verifiedHash == whisperModelSha256) {
+            "Whisper model checksum mismatch. Expected $whisperModelSha256, got $verifiedHash"
+        }
+        logger.lifecycle("Whisper Tiny Q5_1 verified and ready for APK packaging.")
+    }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn("prepareWhisperModel")
+}
