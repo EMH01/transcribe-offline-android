@@ -17,6 +17,7 @@ internal object WhisperNative {
         audioData: FloatArray,
         threadCount: Int,
         language: String,
+        initialPrompt: String?,
     ): String
 
     external fun freeContext(contextPtr: Long)
