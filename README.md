@@ -26,11 +26,18 @@ The goal is not to reproduce a large cloud AI stack on a low-end phone. It is to
 - **Modular architecture** — the speech stack can later be reused by a fully local LLM assistant.
 - **Reproducible builds** — the model and `whisper.cpp` revision are pinned and verified.
 
-## Current experiment: 0.3.4
+## Current experiment: 0.4.0-alpha1
 
-Version **0.3.4** builds on the Whisper Base Q5_1 experiment with an editable **local vocabulary** plus a conservative local correction layer for near-miss names and a small set of observed dictation typos. The vocabulary stays on the device and is passed to Whisper as optional context through `initial_prompt`; post-processing also remains entirely on-device.
+Version **0.4.0-alpha1** keeps the validated Whisper Base Q5_1 transcription pipeline and adds an experimental **fully local writing assistant** based on **Qwen2.5 0.5B Instruct Q4_0** through `llama.cpp`.
 
-It keeps the same offline-first architecture, voice/silence trimming, deterministic decoding, anti-silence safeguards, short beam search (`beam_size = 3`) and performance metrics. The default local vocabulary can be edited from the app and currently includes: `Esther María, Amarilys, Rodovaldo, Guillermina, Alejandro, Martín, Romel, Daniel`. Version 0.3.4 further refines multi-word proper-name matching so variants such as `ser María`, `esta María` or `este María` can resolve to `Esther María` when that full name is present in the local vocabulary, while retaining the narrowly scoped `ditar` → `dictar` correction.
+The app now has two clearly separated modes:
+
+- **Transcribe** — record speech, obtain editable local transcription, and optionally use **✨ Improve writing** to clean punctuation and wording without changing the intended meaning.
+- **Write** — dictate a writing instruction such as “redáctame por puntos…”; Whisper converts the instruction to editable text, then the local LLM generates the requested text.
+
+The existing editable local vocabulary is shared by both Whisper and the local LLM so uncommon names and terms can be preserved across transcription and writing. The Android manifest still contains no `INTERNET` permission: both speech recognition and text generation run on-device after installation.
+
+This alpha intentionally keeps **0.3.4** as the known-good transcription baseline while the larger local LLM is benchmarked on real hardware. The Qwen GGUF is about **429 MB**, so storage, RAM usage and generation speed must be validated on the target phone before this line is considered stable.
 
 The trade-off is deliberate: Base is larger and may take longer to process than Tiny. The app therefore continues to expose audio duration, useful-voice duration, processing time and RTF so the accuracy/performance balance can be measured on the actual device.
 
@@ -81,10 +88,18 @@ These changes improve both **latency** and **transcription stability** on constr
        ├── :core-speech
        │     └── SpeechToTextEngine contract
        │
-       └── :core-whisper
-             ├── WhisperBaseEngine
+       ├── :core-whisper
+       │     ├── WhisperBaseEngine
+       │     ├── JNI bridge
+       │     └── whisper.cpp
+       │
+       ├── :core-text
+       │     └── TextImprovementEngine contract
+       │
+       └── :core-llm
+             ├── LocalQwenTextEngine
              ├── JNI bridge
-             └── whisper.cpp
+             └── llama.cpp + Qwen2.5 0.5B Instruct Q4_0
 ```
 
 The UI does not depend directly on Whisper. It talks to the `SpeechToTextEngine` abstraction, which keeps the application replaceable and reusable.
@@ -95,12 +110,9 @@ That separation is intentional: a future local assistant can reuse `core-audio`,
 
 The Android manifest intentionally contains **no `INTERNET` permission**.
 
-At build time, the development machine downloads two pinned dependencies:
+At build time, the development machine obtains the native inference sources and model weights needed for the selected build. Whisper Base and the Qwen GGUF are SHA-256 verified before packaging.
 
-1. the selected `whisper.cpp` source revision;
-2. `ggml-base-q5_1.bin`, whose SHA-256 is verified before packaging.
-
-The final APK contains the model and native inference code. On the phone, transcription is therefore local and remains available in airplane mode.
+The final APK contains both model families and native inference code. On the phone, transcription, writing improvement and instruction-driven drafting therefore remain available in airplane mode.
 
 ## Model
 
@@ -137,19 +149,23 @@ This makes performance work measurable rather than subjective.
 ## Android compatibility
 
 - **Minimum Android:** 8.0 / API 26
-- **Native ABIs:** `arm64-v8a`, `armeabi-v7a`
+- **Whisper transcription ABIs:** `arm64-v8a`, `armeabi-v7a`
+- **Local LLM writing features:** `arm64-v8a` only in the current alpha
 - **Audio input:** 16-bit PCM, mono, 16 kHz
-- Whisper inference runs on a dedicated background thread so the Compose UI remains responsive.
+- Whisper and Qwen inference run on dedicated background threads so the Compose UI remains responsive.
 
 ## User experience
 
 The interface is intentionally small and direct:
 
+- two clear workspaces: **Transcribe** and **Write**;
 - large primary recording action;
 - clear recording state and timer;
 - lightweight audio-level visualization;
 - explicit processing state;
-- editable transcription result;
+- editable transcription or writing instruction before local generation;
+- optional **Improve writing** action after transcription;
+- editable generated result;
 - copy and share actions;
 - light and dark Material 3 themes;
 - adaptive Android launcher icon.
@@ -202,10 +218,10 @@ The objective is not to present AI-generated code as expertise by itself. It is 
 
 Near-term work:
 
-- compare 0.3.0 Base Q5_1 accuracy and RTF against the 0.2.1 Tiny baseline;
-- expand benchmarks across older Android hardware;
-- tune thread count per CPU class;
-- refine silence detection thresholds from real recordings;
+- benchmark Qwen2.5 0.5B Q4_0 generation speed and RAM usage on the target phone;
+- validate the **Improve writing** prompt against real Spanish dictation;
+- validate voice-driven **Write** instructions and formatting requests;
+- compare smaller quantizations only if device constraints require it;
 - improve long-recording behavior;
 - add local transcription history.
 
@@ -229,6 +245,6 @@ The long-term goal is to reuse the offline speech stack as the input layer for a
 
 ## Third-party software
 
-`whisper.cpp` is developed by Georgi Gerganov and contributors and is used under its MIT license.
+`whisper.cpp` and `llama.cpp` are developed by Georgi Gerganov and contributors and are used under their MIT licenses. The Qwen2.5 model is distributed by Qwen under the Apache 2.0 license.
 
 See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for details.

@@ -23,8 +23,8 @@ android {
         applicationId = "com.emh01.transcribeoffline"
         minSdk = 26
         targetSdk = 35
-        versionCode = 8
-        versionName = "0.3.4"
+        versionCode = 9
+        versionName = "0.4.0-alpha1"
     }
 
     signingConfigs {
@@ -73,6 +73,8 @@ dependencies {
     implementation(project(":core-audio"))
     implementation(project(":core-speech"))
     implementation(project(":core-whisper"))
+    implementation(project(":core-text"))
+    implementation(project(":core-llm"))
 
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")

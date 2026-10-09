@@ -19,3 +19,6 @@ include(":app")
 include(":core-audio")
 include(":core-speech")
 include(":core-whisper")
+
+include(":core-text")
+include(":core-llm")
