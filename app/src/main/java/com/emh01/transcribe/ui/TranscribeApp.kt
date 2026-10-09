@@ -137,7 +137,7 @@ fun TranscribeApp(viewModel: TranscribeViewModel = viewModel()) {
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        text = "Añade nombres propios y palabras que Whisper deba reconocer con más precisión. Se guarda solo en este teléfono.",
+                        text = "Añade nombres propios y palabras que Whisper y la IA local deban conservar con precisión. Se guarda solo en este teléfono.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -234,6 +234,8 @@ private fun TranscribeScreen(
                         state = state,
                         onTextChanged = onTextChanged,
                         onReset = onReset,
+                        onImprove = viewModel::improveWriting,
+                        onRestoreOriginal = viewModel::restoreOriginalText,
                         onCopy = {
                             val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
                                 as android.content.ClipboardManager
@@ -409,6 +411,8 @@ private fun ResultContent(
     state: TranscribeUiState,
     onTextChanged: (String) -> Unit,
     onReset: () -> Unit,
+    onImprove: () -> Unit,
+    onRestoreOriginal: () -> Unit,
     onCopy: () -> Unit,
     onShare: () -> Unit,
 ) {
@@ -451,6 +455,60 @@ private fun ResultContent(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+            }
+        }
+
+        FilledTonalButton(
+            onClick = onImprove,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = state.text.isNotBlank() &&
+                state.llmAvailable &&
+                !state.isImprovingText,
+        ) {
+            if (state.isImprovingText) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                )
+                Spacer(Modifier.width(10.dp))
+                Text("Mejorando redacción…")
+            } else {
+                Text("✨ Mejorar redacción")
+            }
+        }
+
+        if (!state.llmAvailable) {
+            Text(
+                text = "La mejora con IA local requiere un dispositivo Android de 64 bits.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        state.improvementError?.let { message ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+
+        if (state.improvementMs > 0L) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "IA local · %.1f s".format(state.improvementMs / 1000f),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.weight(1f))
+                if (state.originalText != null) {
+                    TextButton(onClick = onRestoreOriginal) {
+                        Text("Restaurar original")
+                    }
                 }
             }
         }
