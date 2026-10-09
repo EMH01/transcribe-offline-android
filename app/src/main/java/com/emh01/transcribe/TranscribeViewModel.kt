@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.emh01.transcribe.audio.PcmAudioRecorder
 import com.emh01.transcribe.audio.VoiceActivityTrimmer
+import com.emh01.transcribe.speech.LocalVocabularyCorrector
 import com.emh01.transcribe.whisper.WhisperBaseEngine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -80,7 +81,7 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
             }.onSuccess { (result, prepared) ->
                 _uiState.value = TranscribeUiState(
                     stage = TranscribeStage.Result,
-                    text = result.text,
+                    text = LocalVocabularyCorrector.correct(result.text, glossary),
                     processingMs = result.elapsedMs,
                     originalAudioMs = prepared.originalDurationMs,
                     processedAudioMs = prepared.processedDurationMs,
