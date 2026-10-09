@@ -2,6 +2,22 @@
 
 All notable changes to **Transcribe Offline Android** are documented here.
 
+## 0.3.0 — Base accuracy experiment
+
+Status: **experimental device benchmark**
+
+### Changed
+
+- Upgraded the on-device recognizer from Whisper Tiny Q5_1 to Whisper Base multilingual Q5_1.
+- Increased packaged model size from roughly 32 MB to roughly 60 MB.
+- Switched decoding from greedy sampling to a short beam search with beam size 3 and patience 1.0.
+- Kept Spanish fixed at `es`, deterministic decoding, silence trimming and anti-hallucination safeguards.
+- Preserved the same fully offline runtime and stable Android signing identity.
+
+### Goal
+
+Measure whether the larger model produces a meaningful improvement in natural Spanish dictation quality on older Android hardware without making processing latency impractical.
+
 ## 0.2.1 — Stable baseline
 
 Status: **validated on real Android hardware**
