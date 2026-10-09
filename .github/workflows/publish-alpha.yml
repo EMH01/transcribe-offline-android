@@ -25,14 +25,23 @@ jobs:
           APK="$(find artifact -type f -name '*.apk' | head -n 1)"
           test -n "$APK"
           cp "$APK" TranscribeOffline-0.4.0-alpha1-offline-llm.apk
-          sha256sum TranscribeOffline-0.4.0-alpha1-offline-llm.apk             | tee TranscribeOffline-0.4.0-alpha1-offline-llm.apk.sha256
+          sha256sum TranscribeOffline-0.4.0-alpha1-offline-llm.apk \
+            | tee TranscribeOffline-0.4.0-alpha1-offline-llm.apk.sha256
 
       - name: Publish prerelease
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
         shell: bash
         run: |
           set -euo pipefail
           TAG="v0.4.0-alpha1"
-          gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
-          gh release create "$TAG"             TranscribeOffline-0.4.0-alpha1-offline-llm.apk             TranscribeOffline-0.4.0-alpha1-offline-llm.apk.sha256             --title "Transcribe Offline v0.4.0-alpha1"             --notes "Experimental fully offline writing-assistant build. Adds Qwen2.5 0.5B Q4_0 local text improvement and voice-driven drafting. Main remains on the validated 0.3.4 baseline until device testing."             --prerelease             --target "$GITHUB_SHA"
+          gh release delete "$TAG" --repo "$REPO" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "$TAG" \
+            TranscribeOffline-0.4.0-alpha1-offline-llm.apk \
+            TranscribeOffline-0.4.0-alpha1-offline-llm.apk.sha256 \
+            --repo "$REPO" \
+            --title "Transcribe Offline v0.4.0-alpha1" \
+            --notes "Experimental fully offline writing-assistant build. Adds Qwen2.5 0.5B Q4_0 local text improvement and voice-driven drafting. Main remains on the validated 0.3.4 baseline until device testing." \
+            --prerelease \
+            --target "$GITHUB_SHA"
