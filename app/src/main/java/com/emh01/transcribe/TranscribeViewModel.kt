@@ -173,6 +173,8 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
         _uiState.update {
             it.copy(
                 instruction = instruction,
+                text = "",
+                draftMs = 0L,
                 draftError = null,
             )
         }
