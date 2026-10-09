@@ -26,11 +26,11 @@ The goal is not to reproduce a large cloud AI stack on a low-end phone. It is to
 - **Modular architecture** — the speech stack can later be reused by a fully local LLM assistant.
 - **Reproducible builds** — the model and `whisper.cpp` revision are pinned and verified.
 
-## Current experiment: 0.3.0
+## Current experiment: 0.3.1
 
-Version **0.3.0** moves the on-device recognizer from Whisper Tiny Q5_1 to **Whisper Base multilingual Q5_1**. The purpose of this release is to test whether the larger model provides a meaningful accuracy gain for natural Spanish dictation while remaining practical on older Android hardware.
+Version **0.3.1** builds on the Whisper Base Q5_1 experiment with an editable **local vocabulary** for proper names and difficult terms. The vocabulary stays on the device and is passed to Whisper as optional context through `initial_prompt`. The purpose of this release is to test whether the larger model provides a meaningful accuracy gain for natural Spanish dictation while remaining practical on older Android hardware.
 
-It keeps the same offline-first architecture, voice/silence trimming, deterministic decoding, anti-silence safeguards and performance metrics, but adds a short beam search (`beam_size = 3`) to improve resolution of ambiguous speech.
+It keeps the same offline-first architecture, voice/silence trimming, deterministic decoding, anti-silence safeguards, short beam search (`beam_size = 3`) and performance metrics. The default local vocabulary can be edited from the app and currently includes: `Esther María, Amarilys, Rodovaldo, Guillermina, Alejandro, Martín, Romel, Daniel`.
 
 The trade-off is deliberate: Base is larger and may take longer to process than Tiny. The app therefore continues to expose audio duration, useful-voice duration, processing time and RTF so the accuracy/performance balance can be measured on the actual device.
 
