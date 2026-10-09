@@ -10,6 +10,6 @@ Project: https://github.com/ggml-org/whisper.cpp
 
 License: MIT.
 
-## Whisper Tiny Q5_1 model
+## Whisper Base Q5_1 model
 
-The build downloads the `ggml-tiny-q5_1.bin` model distributed for `whisper.cpp` from the `ggerganov/whisper.cpp` Hugging Face repository and verifies its SHA-256 before packaging it into the APK.
+The build downloads the `ggml-base-q5_1.bin` model distributed for `whisper.cpp` from the `ggerganov/whisper.cpp` Hugging Face repository and verifies its SHA-256 before packaging it into the APK.
