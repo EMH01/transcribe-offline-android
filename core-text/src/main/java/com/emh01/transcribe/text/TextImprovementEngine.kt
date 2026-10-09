@@ -5,6 +5,11 @@ interface TextImprovementEngine : AutoCloseable {
         text: String,
         glossary: String = "",
     ): TextImprovementResult
+
+    suspend fun draft(
+        instruction: String,
+        glossary: String = "",
+    ): TextImprovementResult
 }
 
 data class TextImprovementResult(
