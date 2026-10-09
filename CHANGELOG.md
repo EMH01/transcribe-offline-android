@@ -2,6 +2,20 @@
 
 All notable changes to **Transcribe Offline Android** are documented here.
 
+## 0.3.3 — Dictation typo refinement
+
+Status: **experimental device benchmark**
+
+### Improved
+
+- Refined multi-word vocabulary matching so close variants such as `esta María` can resolve to `Esther María` when that name is present in the local vocabulary.
+- Added a narrowly scoped post-correction for the observed dictation error `ditar` → `dictar`.
+- Kept the correction layer conservative: it never inserts missing semantic content such as `mi hija` when Whisper did not transcribe it.
+
+### Performance
+
+These corrections are local string operations and add negligible latency compared with Whisper inference.
+
 ## 0.3.2 — Conservative vocabulary correction
 
 Status: **experimental device benchmark**
