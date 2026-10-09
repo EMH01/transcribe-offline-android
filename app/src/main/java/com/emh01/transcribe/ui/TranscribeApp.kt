@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -40,12 +41,14 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
@@ -96,6 +99,8 @@ fun TranscribeTheme(content: @Composable () -> Unit) {
 fun TranscribeApp(viewModel: TranscribeViewModel = viewModel()) {
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    var showGlossary by remember { mutableStateOf(false) }
+    var glossaryDraft by remember(state.glossary) { mutableStateOf(state.glossary) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -119,7 +124,51 @@ fun TranscribeApp(viewModel: TranscribeViewModel = viewModel()) {
         onStop = viewModel::stopAndTranscribe,
         onTextChanged = viewModel::updateText,
         onReset = viewModel::reset,
+        onGlossaryRequested = {
+            glossaryDraft = state.glossary
+            showGlossary = true
+        },
     )
+
+    if (showGlossary) {
+        AlertDialog(
+            onDismissRequest = { showGlossary = false },
+            title = { Text("Vocabulario local") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "Añade nombres propios y palabras que Whisper deba reconocer con más precisión. Se guarda solo en este teléfono.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    OutlinedTextField(
+                        value = glossaryDraft,
+                        onValueChange = { glossaryDraft = it.take(500) },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Nombres y términos") },
+                        placeholder = { Text("Ej.: Esther María, OpenAI, NumPy") },
+                        minLines = 3,
+                        maxLines = 6,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.saveGlossary(glossaryDraft)
+                        showGlossary = false
+                    },
+                ) {
+                    Text("Guardar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showGlossary = false }) {
+                    Text("Cancelar")
+                }
+            },
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -130,6 +179,7 @@ private fun TranscribeScreen(
     onStop: () -> Unit,
     onTextChanged: (String) -> Unit,
     onReset: () -> Unit,
+    onGlossaryRequested: () -> Unit,
 ) {
     val context = LocalContext.current
 
@@ -155,6 +205,10 @@ private fun TranscribeScreen(
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick = onGlossaryRequested) {
+                    Text("Vocabulario")
                 }
             }
         },
