@@ -5,7 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.emh01.transcribe.audio.PcmAudioRecorder
 import com.emh01.transcribe.audio.VoiceActivityTrimmer
-import com.emh01.transcribe.whisper.WhisperTinyEngine
+import com.emh01.transcribe.whisper.WhisperBaseEngine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
 
 class TranscribeViewModel(application: Application) : AndroidViewModel(application) {
     private val recorder = PcmAudioRecorder()
-    private val speechEngine = WhisperTinyEngine(application)
+    private val speechEngine = WhisperBaseEngine(application)
 
     private val _uiState = MutableStateFlow(TranscribeUiState())
     val uiState: StateFlow<TranscribeUiState> = _uiState.asStateFlow()
