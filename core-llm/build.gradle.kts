@@ -65,16 +65,16 @@ fun sha256(file: File): String {
 }
 
 val qwenModelUrl =
-    "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf"
+    "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_0.gguf"
 val qwenModelSha256 =
-    "74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db"
+    "7671c0c304e6ce5a7fc577bcb12aba01e2c155cc2efd29b2213c95b18edaf6ed"
 val qwenModel = layout.projectDirectory.file(
-    "src/main/assets/models/qwen2.5-0.5b-instruct-q4_k_m.gguf",
+    "src/main/assets/models/qwen2.5-0.5b-instruct-q4_0.gguf",
 ).asFile
 
 tasks.register("prepareLocalTextModel") {
     group = "llm"
-    description = "Downloads and verifies Qwen2.5 0.5B Instruct Q4_K_M for offline text improvement."
+    description = "Downloads and verifies Qwen2.5 0.5B Instruct Q4_0 for offline text improvement."
 
     doLast {
         qwenModel.parentFile.mkdirs()
@@ -82,7 +82,7 @@ tasks.register("prepareLocalTextModel") {
         val currentHash = if (qwenModel.exists()) sha256(qwenModel) else null
         if (currentHash != qwenModelSha256) {
             if (qwenModel.exists()) qwenModel.delete()
-            logger.lifecycle("Downloading Qwen2.5 0.5B Instruct Q4_K_M (about 491 MB)…")
+            logger.lifecycle("Downloading Qwen2.5 0.5B Instruct Q4_0 (about 429 MB)…")
 
             val connection = URI.create(qwenModelUrl).toURL().openConnection().apply {
                 connectTimeout = 30_000
@@ -100,7 +100,7 @@ tasks.register("prepareLocalTextModel") {
         check(verifiedHash == qwenModelSha256) {
             "Qwen model checksum mismatch. Expected $qwenModelSha256, got $verifiedHash"
         }
-        logger.lifecycle("Qwen2.5 0.5B Instruct Q4_K_M verified and ready for APK packaging.")
+        logger.lifecycle("Qwen2.5 0.5B Instruct Q4_0 verified and ready for APK packaging.")
     }
 }
 
