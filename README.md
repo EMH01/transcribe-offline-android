@@ -28,7 +28,7 @@ The goal is not to reproduce a large cloud AI stack on a low-end phone. It is to
 
 ## Current experiment: 0.3.0
 
-Version **0.3.0** moves the on-device recognizer from Whisper Base Q5_1 to **Whisper Base multilingual Q5_1**. The purpose of this release is to test whether the larger model provides a meaningful accuracy gain for natural Spanish dictation while remaining practical on older Android hardware.
+Version **0.3.0** moves the on-device recognizer from Whisper Tiny Q5_1 to **Whisper Base multilingual Q5_1**. The purpose of this release is to test whether the larger model provides a meaningful accuracy gain for natural Spanish dictation while remaining practical on older Android hardware.
 
 It keeps the same offline-first architecture, voice/silence trimming, deterministic decoding, anti-silence safeguards and performance metrics, but adds a short beam search (`beam_size = 3`) to improve resolution of ambiguous speech.
 
@@ -45,7 +45,7 @@ Microphone
     ↓
 lightweight voice/silence trimming
     ↓
-Whisper Base Q5_1
+Whisper Tiny Q5_1
     ↓
 editable transcription
     ↓
