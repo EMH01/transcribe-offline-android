@@ -19,7 +19,11 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
         "transcribe_preferences",
         Application.MODE_PRIVATE,
     )
-    private var glossary: String = preferences.getString(KEY_GLOSSARY, "").orEmpty()
+    private var glossary: String = if (preferences.contains(KEY_GLOSSARY)) {
+        preferences.getString(KEY_GLOSSARY, "").orEmpty()
+    } else {
+        DEFAULT_GLOSSARY
+    }
 
     private val _uiState = MutableStateFlow(TranscribeUiState(glossary = glossary))
     val uiState: StateFlow<TranscribeUiState> = _uiState.asStateFlow()
@@ -144,3 +148,5 @@ data class TranscribeUiState(
 
 private const val KEY_GLOSSARY = "local_glossary"
 private const val MAX_GLOSSARY_CHARS = 500
+private const val DEFAULT_GLOSSARY =
+    "Esther María, Amarilys, Rodovaldo, Guillermina, Alejandro, Martín, Romel, Daniel"
