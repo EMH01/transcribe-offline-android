@@ -2,6 +2,8 @@ name: Publish signed release
 
 on:
   push:
+    branches:
+      - feature/offline-writing-llm
     tags:
       - "v*"
   workflow_dispatch:
@@ -107,6 +109,8 @@ jobs:
           set -euo pipefail
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             VERSION="${GITHUB_REF_NAME#v}"
+          elif [[ "${GITHUB_REF_NAME}" == "feature/offline-writing-llm" ]]; then
+            VERSION="0.4.0-alpha1"
           else
             VERSION="manual-${GITHUB_RUN_NUMBER}"
           fi
@@ -125,11 +129,18 @@ jobs:
           if-no-files-found: error
 
       - name: Publish GitHub Release
-        if: github.ref_type == 'tag'
+        if: github.ref_type == 'tag' || github.ref_name == 'feature/offline-writing-llm'
         env:
           GH_TOKEN: ${{ github.token }}
           APK_FILE: ${{ steps.package.outputs.file }}
         shell: bash
         run: |
           set -euo pipefail
-          gh release create "$GITHUB_REF_NAME"             "$APK_FILE"             "$APK_FILE.sha256"             --title "Transcribe Offline $GITHUB_REF_NAME"             --generate-notes
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            TAG="${GITHUB_REF_NAME}"
+            gh release create "$TAG"               "$APK_FILE"               "$APK_FILE.sha256"               --title "Transcribe Offline $TAG"               --generate-notes
+          else
+            TAG="v0.4.0-alpha1"
+            gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
+            gh release create "$TAG"               "$APK_FILE"               "$APK_FILE.sha256"               --title "Transcribe Offline v0.4.0-alpha1"               --notes "Experimental fully offline writing-assistant build. Adds local Qwen2.5 0.5B Q4_0 text improvement and voice-driven drafting. Main remains on the validated 0.3.4 baseline until device testing."               --prerelease               --target "$GITHUB_SHA"
+          fi
