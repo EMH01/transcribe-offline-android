@@ -23,8 +23,8 @@ android {
         applicationId = "com.emh01.transcribeoffline"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.2.1"
+        versionCode = 4
+        versionName = "0.3.0"
     }
 
     signingConfigs {
@@ -103,16 +103,16 @@ fun sha256(file: File): String {
 }
 
 val whisperModelUrl =
-    "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny-q5_1.bin?download=true"
+    "https://huggingface.co/ggerganov/whisper.cpp/resolve/f281eb45af861ab5e5297d23694b7d46e090c02c/ggml-base-q5_1.bin"
 val whisperModelSha256 =
-    "818710568da3ca15689e31a743197b520007872ff9576237bda97bd1b469c3d7"
+    "422f1ae452ade6f30a004d7e5c6a43195e4433bc370bf23fac9cc591f01a8898"
 val whisperModel = layout.projectDirectory.file(
-    "src/main/assets/models/ggml-tiny-q5_1.bin",
+    "src/main/assets/models/ggml-base-q5_1.bin",
 ).asFile
 
 tasks.register("prepareWhisperModel") {
     group = "whisper"
-    description = "Downloads and verifies Whisper Tiny Q5_1 for packaging in the APK."
+    description = "Downloads and verifies Whisper Base Q5_1 for packaging in the APK."
 
     doLast {
         whisperModel.parentFile.mkdirs()
@@ -120,7 +120,7 @@ tasks.register("prepareWhisperModel") {
         val currentHash = if (whisperModel.exists()) sha256(whisperModel) else null
         if (currentHash != whisperModelSha256) {
             if (whisperModel.exists()) whisperModel.delete()
-            logger.lifecycle("Downloading Whisper Tiny Q5_1 (about 32 MB)…")
+            logger.lifecycle("Downloading Whisper Base Q5_1 (about 60 MB)…")
 
             val connection = URI.create(whisperModelUrl).toURL().openConnection().apply {
                 connectTimeout = 30_000
@@ -138,7 +138,7 @@ tasks.register("prepareWhisperModel") {
         check(verifiedHash == whisperModelSha256) {
             "Whisper model checksum mismatch. Expected $whisperModelSha256, got $verifiedHash"
         }
-        logger.lifecycle("Whisper Tiny Q5_1 verified and ready for APK packaging.")
+        logger.lifecycle("Whisper Base Q5_1 verified and ready for APK packaging.")
     }
 }
 
