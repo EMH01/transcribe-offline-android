@@ -10,6 +10,7 @@ interface SpeechToTextEngine : AutoCloseable {
         samples: FloatArray,
         sampleRate: Int = 16_000,
         language: String = "es",
+        initialPrompt: String? = null,
     ): TranscriptionResult
 
     override fun close()
