@@ -2,6 +2,21 @@
 
 All notable changes to **Transcribe Offline Android** are documented here.
 
+## 0.3.1 — Local vocabulary hints
+
+Status: **experimental device benchmark**
+
+### Added
+
+- Editable local vocabulary for proper names and difficult terms.
+- On-device persistence through Android SharedPreferences.
+- Whisper `initial_prompt` support through the speech-engine abstraction and JNI bridge.
+- Initial vocabulary: Esther María, Amarilys, Rodovaldo, Guillermina, Alejandro, Martín, Romel and Daniel.
+
+### Privacy
+
+The vocabulary is stored only on the phone and is never sent to a network service.
+
 ## 0.3.0 — Base accuracy experiment
 
 Status: **experimental device benchmark**
