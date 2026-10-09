@@ -8,7 +8,7 @@ Status: **experimental device benchmark**
 
 ### Added
 
-- Fully local Qwen2.5 0.5B Instruct Q4_K_M text generation through `llama.cpp`.
+- Fully local Qwen2.5 0.5B Instruct Q4_0 text generation through `llama.cpp`.
 - **✨ Mejorar redacción** after a Whisper transcription.
 - Separate **Redactar** workspace: dictate a writing instruction, review/edit it, then generate the requested text locally.
 - Shared local vocabulary context for both speech recognition and local writing so uncommon names and terms can be preserved.
@@ -26,7 +26,7 @@ The local writing model is currently enabled on 64-bit Android devices. The exis
 
 ### Size
 
-The Qwen Q4_K_M model is approximately 491 MB, so this alpha must be tested on real target hardware before promotion to a stable release.
+The Qwen Q4_K_M model is approximately 429 MB, so this alpha must be tested on real target hardware before promotion to a stable release.
 
 ## 0.3.4 — Proper-name phonetic refinement
 
