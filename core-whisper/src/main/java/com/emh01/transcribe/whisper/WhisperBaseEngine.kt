@@ -27,6 +27,7 @@ class WhisperBaseEngine(
         samples: FloatArray,
         sampleRate: Int,
         language: String,
+        initialPrompt: String?,
     ): TranscriptionResult = withContext(dispatcher) {
         check(!closed) { "Whisper engine is closed" }
         require(sampleRate == REQUIRED_SAMPLE_RATE) {
@@ -41,6 +42,7 @@ class WhisperBaseEngine(
             audioData = samples,
             threadCount = preferredThreadCount(),
             language = language,
+            initialPrompt = initialPrompt?.trim()?.takeIf { it.isNotEmpty() },
         ).trim()
 
         TranscriptionResult(
