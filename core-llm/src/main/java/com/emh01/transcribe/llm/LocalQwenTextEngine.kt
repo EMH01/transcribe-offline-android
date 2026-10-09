@@ -250,11 +250,11 @@ class LocalQwenTextEngine(
 
     companion object {
         const val DEFAULT_MODEL_ASSET =
-            "models/qwen2.5-0.5b-instruct-q4_k_m.gguf"
+            "models/qwen2.5-0.5b-instruct-q4_0.gguf"
 
         private const val MODEL_FILE_NAME =
-            "qwen2.5-0.5b-instruct-q4_k_m.gguf"
-        private const val MIN_EXPECTED_MODEL_BYTES = 450_000_000L
+            "qwen2.5-0.5b-instruct-q4_0.gguf"
+        private const val MIN_EXPECTED_MODEL_BYTES = 400_000_000L
         private const val MAX_CHUNK_CHARS = 2_200
         private const val MAX_OUTPUT_TOKENS = 512
         private const val MAX_DRAFT_TOKENS = 768
