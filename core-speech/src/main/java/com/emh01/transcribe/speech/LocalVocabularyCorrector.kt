@@ -109,7 +109,7 @@ object LocalVocabularyCorrector {
         var corrected = text
         for ((variant, canonical) in KNOWN_DICTATION_CORRECTIONS) {
             val pattern = Regex(
-                """(?iu)(?<!\\p{L})${Regex.escape(variant)}(?!\\p{L})""",
+                """(?iu)(?<!\p{L})${Regex.escape(variant)}(?!\p{L})""",
             )
             corrected = pattern.replace(corrected) { match ->
                 if (match.value.firstOrNull()?.isUpperCase() == true) {
