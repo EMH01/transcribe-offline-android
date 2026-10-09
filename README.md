@@ -4,7 +4,7 @@
 
 It is intended for people and environments where reliable access to cloud AI cannot be assumed: intermittent or expensive connectivity, slow networks, older hardware, limited infrastructure, or regions and networks where modern online services are unavailable or restricted.
 
-The app records speech locally and transcribes it with **Whisper Tiny multilingual Q5_1** through `whisper.cpp`. Once installed, it requires **no account, API key, server, cloud service, or Internet connection** to perform transcription.
+The app records speech locally and transcribes it with **Whisper Base multilingual Q5_1** through `whisper.cpp`. Once installed, it requires **no account, API key, server, cloud service, or Internet connection** to perform transcription.
 
 ## Why this project exists
 
@@ -26,6 +26,14 @@ The goal is not to reproduce a large cloud AI stack on a low-end phone. It is to
 - **Modular architecture** — the speech stack can later be reused by a fully local LLM assistant.
 - **Reproducible builds** — the model and `whisper.cpp` revision are pinned and verified.
 
+## Current experiment: 0.3.0
+
+Version **0.3.0** moves the on-device recognizer from Whisper Base Q5_1 to **Whisper Base multilingual Q5_1**. The purpose of this release is to test whether the larger model provides a meaningful accuracy gain for natural Spanish dictation while remaining practical on older Android hardware.
+
+It keeps the same offline-first architecture, voice/silence trimming, deterministic decoding, anti-silence safeguards and performance metrics, but adds a short beam search (`beam_size = 3`) to improve resolution of ambiguous speech.
+
+The trade-off is deliberate: Base is larger and may take longer to process than Tiny. The app therefore continues to expose audio duration, useful-voice duration, processing time and RTF so the accuracy/performance balance can be measured on the actual device.
+
 ## Stable baseline: 0.2.1
 
 The application has a working end-to-end offline pipeline that has been validated on real Android hardware:
@@ -37,14 +45,14 @@ Microphone
     ↓
 lightweight voice/silence trimming
     ↓
-Whisper Tiny Q5_1
+Whisper Base Q5_1
     ↓
 editable transcription
     ↓
 copy / share
 ```
 
-Version **0.2.1** adds the first performance and reliability pass over the working baseline:
+Version **0.2.1** established the first performance and reliability baseline:
 
 - lightweight energy-based voice activity trimming before inference;
 - leading and trailing silence removal to avoid wasting CPU time;
@@ -74,7 +82,7 @@ These changes improve both **latency** and **transcription stability** on constr
        │     └── SpeechToTextEngine contract
        │
        └── :core-whisper
-             ├── WhisperTinyEngine
+             ├── WhisperBaseEngine
              ├── JNI bridge
              └── whisper.cpp
 ```
@@ -90,18 +98,18 @@ The Android manifest intentionally contains **no `INTERNET` permission**.
 At build time, the development machine downloads two pinned dependencies:
 
 1. the selected `whisper.cpp` source revision;
-2. `ggml-tiny-q5_1.bin`, whose SHA-256 is verified before packaging.
+2. `ggml-base-q5_1.bin`, whose SHA-256 is verified before packaging.
 
 The final APK contains the model and native inference code. On the phone, transcription is therefore local and remains available in airplane mode.
 
 ## Model
 
-- **Model:** `ggml-tiny-q5_1.bin`
-- **Family:** Whisper Tiny multilingual
+- **Model:** `ggml-base-q5_1.bin`
+- **Family:** Whisper Base multilingual
 - **Quantization:** Q5_1
-- **Approximate model size:** 32 MB
+- **Approximate model size:** 60 MB
 - **Runtime language:** Spanish (`es`)
-- **SHA-256:** `818710568da3ca15689e31a743197b520007872ff9576237bda97bd1b469c3d7`
+- **SHA-256:** `422f1ae452ade6f30a004d7e5c6a43195e4433bc370bf23fac9cc591f01a8898`
 
 The model binary is not committed to Git. Gradle downloads and verifies it before packaging it under `assets/models/`.
 
@@ -194,6 +202,7 @@ The objective is not to present AI-generated code as expertise by itself. It is 
 
 Near-term work:
 
+- compare 0.3.0 Base Q5_1 accuracy and RTF against the 0.2.1 Tiny baseline;
 - expand benchmarks across older Android hardware;
 - tune thread count per CPU class;
 - refine silence detection thresholds from real recordings;
