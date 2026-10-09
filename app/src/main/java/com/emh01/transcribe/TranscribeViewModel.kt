@@ -51,6 +51,7 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
                 _uiState.value = TranscribeUiState(
                     stage = TranscribeStage.Error,
                     errorMessage = error.message ?: "No se pudo usar el micrófono.",
+                    glossary = glossary,
                 )
             },
         )
