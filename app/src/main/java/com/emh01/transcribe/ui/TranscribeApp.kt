@@ -124,6 +124,8 @@ fun TranscribeApp(viewModel: TranscribeViewModel = viewModel()) {
         onStop = viewModel::stopAndTranscribe,
         onTextChanged = viewModel::updateText,
         onReset = viewModel::reset,
+        onImprove = viewModel::improveWriting,
+        onRestoreOriginal = viewModel::restoreOriginalText,
         onGlossaryRequested = {
             glossaryDraft = state.glossary
             showGlossary = true
@@ -179,6 +181,8 @@ private fun TranscribeScreen(
     onStop: () -> Unit,
     onTextChanged: (String) -> Unit,
     onReset: () -> Unit,
+    onImprove: () -> Unit,
+    onRestoreOriginal: () -> Unit,
     onGlossaryRequested: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -234,8 +238,8 @@ private fun TranscribeScreen(
                         state = state,
                         onTextChanged = onTextChanged,
                         onReset = onReset,
-                        onImprove = viewModel::improveWriting,
-                        onRestoreOriginal = viewModel::restoreOriginalText,
+                        onImprove = onImprove,
+                        onRestoreOriginal = onRestoreOriginal,
                         onCopy = {
                             val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
                                 as android.content.ClipboardManager
