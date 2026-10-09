@@ -51,6 +51,15 @@ object LocalVocabularyCorrector {
                 matches.subList(start, end + 1).joinToString(" ") { it.value },
             )
 
+            // For a fuzzy single-word correction, require Whisper to have
+            // treated the candidate like a proper noun (capitalized). Exact
+            // normalized matches may still restore accents/canonical casing.
+            if (
+                entryWords.size == 1 &&
+                candidateNorm != canonicalNorm &&
+                raw.firstOrNull()?.isLowerCase() == true
+            ) continue
+
             if (!isCloseEnough(candidateNorm, canonicalNorm, entryWords.size)) continue
             if (raw == entry) continue
             replacements += first.range.first..last.range.last
