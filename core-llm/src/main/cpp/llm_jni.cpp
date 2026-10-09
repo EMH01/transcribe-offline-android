@@ -147,7 +147,7 @@ Java_com_emh01_transcribe_llm_LlamaNative_generate(
         return env->NewStringUTF("");
     }
 
-    const int32_t safe_max_tokens = std::clamp(static_cast<int32_t>(max_tokens), 32, 512);
+    const int32_t safe_max_tokens = std::clamp(static_cast<int32_t>(max_tokens), 32, 768);
     const int32_t safe_threads = std::clamp(static_cast<int32_t>(thread_count), 1, 6);
     const int32_t required_context = n_prompt + safe_max_tokens + 8;
 
