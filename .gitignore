@@ -16,3 +16,6 @@ app/src/main/assets/models/*.bin
 keystore.properties
 *.jks
 *.keystore
+
+# Build-downloaded local LLM weights
+core-llm/src/main/assets/models/*.gguf
