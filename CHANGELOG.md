@@ -2,6 +2,20 @@
 
 All notable changes to **Transcribe Offline Android** are documented here.
 
+## 0.3.4 — Proper-name phonetic refinement
+
+Status: **experimental device benchmark**
+
+### Improved
+
+- Multi-word vocabulary matching now tolerates a larger phonetic miss on the first token when the remaining name tokens match exactly.
+- Specifically covers observed cases such as `ser María` → `Esther María`.
+- Keeps the safeguard that the distinctive trailing part of the proper name must already match, reducing the risk of unrelated replacements.
+
+### Performance
+
+The refinement is a small local string comparison and adds negligible latency.
+
 ## 0.3.3 — Dictation typo refinement
 
 Status: **experimental device benchmark**
