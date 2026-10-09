@@ -26,11 +26,11 @@ The goal is not to reproduce a large cloud AI stack on a low-end phone. It is to
 - **Modular architecture** — the speech stack can later be reused by a fully local LLM assistant.
 - **Reproducible builds** — the model and `whisper.cpp` revision are pinned and verified.
 
-## Current experiment: 0.3.3
+## Current experiment: 0.3.4
 
-Version **0.3.3** builds on the Whisper Base Q5_1 experiment with an editable **local vocabulary** plus a conservative local correction layer for near-miss names and a small set of observed dictation typos. The vocabulary stays on the device and is passed to Whisper as optional context through `initial_prompt`; post-processing also remains entirely on-device.
+Version **0.3.4** builds on the Whisper Base Q5_1 experiment with an editable **local vocabulary** plus a conservative local correction layer for near-miss names and a small set of observed dictation typos. The vocabulary stays on the device and is passed to Whisper as optional context through `initial_prompt`; post-processing also remains entirely on-device.
 
-It keeps the same offline-first architecture, voice/silence trimming, deterministic decoding, anti-silence safeguards, short beam search (`beam_size = 3`) and performance metrics. The default local vocabulary can be edited from the app and currently includes: `Esther María, Amarilys, Rodovaldo, Guillermina, Alejandro, Martín, Romel, Daniel`. Version 0.3.3 also refines matching for cases such as `esta María` → `Esther María` and adds a narrowly scoped `ditar` → `dictar` correction.
+It keeps the same offline-first architecture, voice/silence trimming, deterministic decoding, anti-silence safeguards, short beam search (`beam_size = 3`) and performance metrics. The default local vocabulary can be edited from the app and currently includes: `Esther María, Amarilys, Rodovaldo, Guillermina, Alejandro, Martín, Romel, Daniel`. Version 0.3.4 further refines multi-word proper-name matching so variants such as `ser María`, `esta María` or `este María` can resolve to `Esther María` when that full name is present in the local vocabulary, while retaining the narrowly scoped `ditar` → `dictar` correction.
 
 The trade-off is deliberate: Base is larger and may take longer to process than Tiny. The app therefore continues to expose audio duration, useful-voice duration, processing time and RTF so the accuracy/performance balance can be measured on the actual device.
 
