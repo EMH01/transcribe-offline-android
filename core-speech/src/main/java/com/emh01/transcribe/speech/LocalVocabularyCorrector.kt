@@ -15,7 +15,10 @@ object LocalVocabularyCorrector {
     private val wordRegex = Regex("""\p{L}+(?:['’\-]\p{L}+)*""")
 
     fun correct(text: String, glossary: String): String {
-        if (text.isBlank() || glossary.isBlank()) return text
+        if (text.isBlank()) return text
+
+        var corrected = applyKnownDictationCorrections(text)
+        if (glossary.isBlank()) return corrected
 
         val entries = glossary
             .split(',', ';', '\n')
@@ -24,7 +27,6 @@ object LocalVocabularyCorrector {
             .distinctBy(::normalize)
             .sortedByDescending { wordRegex.findAll(it).count() * 1000 + it.length }
 
-        var corrected = text
         for (entry in entries) {
             corrected = applyEntry(corrected, entry)
         }
@@ -84,10 +86,40 @@ object LocalVocabularyCorrector {
         val similarity = 1f - distance.toFloat() / longest
 
         return if (wordCount > 1) {
-            distance <= 3 && similarity >= 0.76f
+            val candidateWords = candidate.split(' ')
+            val canonicalWords = canonical.split(' ')
+            val trailingWordsMatch =
+                candidateWords.size == canonicalWords.size &&
+                    candidateWords.size > 1 &&
+                    candidateWords.drop(1) == canonicalWords.drop(1)
+            val leadingPrefixMatch =
+                candidateWords.firstOrNull()?.take(3) ==
+                    canonicalWords.firstOrNull()?.take(3)
+
+            distance <= 3 && (
+                similarity >= 0.76f ||
+                    (trailingWordsMatch && leadingPrefixMatch && similarity >= 0.74f)
+                )
         } else {
             canonical.length >= 5 && distance <= 2 && similarity >= 0.80f
         }
+    }
+
+    private fun applyKnownDictationCorrections(text: String): String {
+        var corrected = text
+        for ((variant, canonical) in KNOWN_DICTATION_CORRECTIONS) {
+            val pattern = Regex(
+                """(?iu)(?<!\\p{L})${Regex.escape(variant)}(?!\\p{L})""",
+            )
+            corrected = pattern.replace(corrected) { match ->
+                if (match.value.firstOrNull()?.isUpperCase() == true) {
+                    canonical.replaceFirstChar { it.uppercase() }
+                } else {
+                    canonical
+                }
+            }
+        }
+        return corrected
     }
 
     private fun normalize(value: String): String {
@@ -98,6 +130,10 @@ object LocalVocabularyCorrector {
             .trim()
             .replace(Regex("""\s+"""), " ")
     }
+
+    private val KNOWN_DICTATION_CORRECTIONS = mapOf(
+        "ditar" to "dictar",
+    )
 
     private fun levenshtein(a: String, b: String): Int {
         if (a == b) return 0
