@@ -79,30 +79,58 @@ object LocalVocabularyCorrector {
     private fun isCloseEnough(candidate: String, canonical: String, wordCount: Int): Boolean {
         if (candidate == canonical) return true
         if (candidate.isBlank() || canonical.isBlank()) return false
-        if (candidate.first() != canonical.first()) return false
 
-        val distance = levenshtein(candidate, canonical)
-        val longest = max(candidate.length, canonical.length)
-        val similarity = 1f - distance.toFloat() / longest
-
-        return if (wordCount > 1) {
+        if (wordCount > 1) {
             val candidateWords = candidate.split(' ')
             val canonicalWords = canonical.split(' ')
+            val sameWordCount = candidateWords.size == canonicalWords.size
             val trailingWordsMatch =
-                candidateWords.size == canonicalWords.size &&
+                sameWordCount &&
                     candidateWords.size > 1 &&
                     candidateWords.drop(1) == canonicalWords.drop(1)
+
+            // If the rest of a multi-word proper name matches exactly, allow a
+            // slightly wider phonetic miss on the first token. This covers
+            // observed variants such as "ser María" -> "Esther María" while
+            // still requiring the distinctive trailing name to match exactly.
+            if (trailingWordsMatch) {
+                val candidateFirst = candidateWords.first()
+                val canonicalFirst = canonicalWords.first()
+                val firstDistance = levenshtein(candidateFirst, canonicalFirst)
+                val firstLongest = max(candidateFirst.length, canonicalFirst.length)
+                val firstSimilarity =
+                    1f - firstDistance.toFloat() / max(1, firstLongest)
+
+                if (
+                    canonicalFirst.length >= 5 &&
+                    candidateFirst.length >= 3 &&
+                    firstDistance <= 3 &&
+                    firstSimilarity >= 0.50f
+                ) {
+                    return true
+                }
+            }
+
+            if (candidate.first() != canonical.first()) return false
+
+            val distance = levenshtein(candidate, canonical)
+            val longest = max(candidate.length, canonical.length)
+            val similarity = 1f - distance.toFloat() / longest
             val leadingPrefixMatch =
                 candidateWords.firstOrNull()?.take(3) ==
                     canonicalWords.firstOrNull()?.take(3)
 
-            distance <= 3 && (
+            return distance <= 3 && (
                 similarity >= 0.76f ||
                     (trailingWordsMatch && leadingPrefixMatch && similarity >= 0.74f)
                 )
-        } else {
-            canonical.length >= 5 && distance <= 2 && similarity >= 0.80f
         }
+
+        if (candidate.first() != canonical.first()) return false
+        val distance = levenshtein(candidate, canonical)
+        val longest = max(candidate.length, canonical.length)
+        val similarity = 1f - distance.toFloat() / longest
+        return canonical.length >= 5 && distance <= 2 && similarity >= 0.80f
     }
 
     private fun applyKnownDictationCorrections(text: String): String {
