@@ -60,6 +60,37 @@ class LocalQwenTextEngine(
         )
     }
 
+    override suspend fun draft(
+        instruction: String,
+        glossary: String,
+    ): TextImprovementResult = withContext(dispatcher) {
+        check(!closed) { "El motor de redacción está cerrado." }
+        check(isSupportedDevice()) {
+            "La redacción local necesita un dispositivo Android de 64 bits."
+        }
+
+        val cleanInstruction = instruction.trim()
+        require(cleanInstruction.isNotEmpty()) { "No hay ninguna instrucción para redactar." }
+        require(cleanInstruction.length <= MAX_INSTRUCTION_CHARS) {
+            "La instrucción es demasiado larga para este modelo local."
+        }
+
+        val startedAt = SystemClock.elapsedRealtime()
+        val ptr = ensureModel()
+        val prompt = buildDraftPrompt(cleanInstruction, glossary)
+        val raw = LlamaNative.generate(
+            modelPtr = ptr,
+            prompt = prompt,
+            maxTokens = MAX_DRAFT_TOKENS,
+            threadCount = preferredThreadCount(),
+        )
+
+        TextImprovementResult(
+            text = cleanModelOutput(raw),
+            elapsedMs = SystemClock.elapsedRealtime() - startedAt,
+        )
+    }
+
     private fun ensureModel(): Long {
         if (modelPtr == 0L) {
             val modelFile = ensureModelFile()
@@ -121,6 +152,35 @@ class LocalQwenTextEngine(
             append("<|im_start|>user\n")
             append("Mejora este dictado:\n")
             append(text)
+            append("<|im_end|>\n")
+            append("<|im_start|>assistant\n")
+        }
+    }
+
+    private fun buildDraftPrompt(instruction: String, glossary: String): String {
+        val vocabulary = glossary
+            .split(',', ';', '\n')
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+            .joinToString(", ")
+            .ifBlank { "(sin vocabulario adicional)" }
+
+        val system = """
+            Eres un asistente de redacción en español que funciona completamente sin conexión.
+            Sigue la instrucción del usuario y redacta el contenido solicitado.
+            Devuelve únicamente el texto final, sin explicar lo que hiciste ni añadir comentarios.
+            Respeta el formato pedido: párrafos, lista por puntos, mensaje, resumen u otro formato.
+            No inventes datos concretos que el usuario no haya dado.
+            Conserva exactamente los nombres propios y términos del vocabulario local cuando correspondan.
+            Vocabulario local: $vocabulary
+        """.trimIndent()
+
+        return buildString {
+            append("<|im_start|>system\n")
+            append(system)
+            append("<|im_end|>\n")
+            append("<|im_start|>user\n")
+            append(instruction)
             append("<|im_end|>\n")
             append("<|im_start|>assistant\n")
         }
@@ -197,6 +257,8 @@ class LocalQwenTextEngine(
         private const val MIN_EXPECTED_MODEL_BYTES = 450_000_000L
         private const val MAX_CHUNK_CHARS = 2_200
         private const val MAX_OUTPUT_TOKENS = 512
+        private const val MAX_DRAFT_TOKENS = 768
+        private const val MAX_INSTRUCTION_CHARS = 3_000
 
         fun isSupportedDevice(): Boolean =
             Build.SUPPORTED_64_BIT_ABIS.isNotEmpty()
