@@ -28,7 +28,7 @@ The goal is not to reproduce a large cloud AI stack on a low-end phone. It is to
 
 ## Current experiment: 0.4.0-alpha1
 
-Version **0.4.0-alpha1** keeps the validated Whisper Base Q5_1 transcription pipeline and adds an experimental **fully local writing assistant** based on **Qwen2.5 0.5B Instruct Q4_K_M** through `llama.cpp`.
+Version **0.4.0-alpha1** keeps the validated Whisper Base Q5_1 transcription pipeline and adds an experimental **fully local writing assistant** based on **Qwen2.5 0.5B Instruct Q4_0** through `llama.cpp`.
 
 The app now has two clearly separated modes:
 
@@ -37,7 +37,7 @@ The app now has two clearly separated modes:
 
 The existing editable local vocabulary is shared by both Whisper and the local LLM so uncommon names and terms can be preserved across transcription and writing. The Android manifest still contains no `INTERNET` permission: both speech recognition and text generation run on-device after installation.
 
-This alpha intentionally keeps **0.3.4** as the known-good transcription baseline while the larger local LLM is benchmarked on real hardware. The Qwen GGUF is about **491 MB**, so storage, RAM usage and generation speed must be validated on the target phone before this line is considered stable.
+This alpha intentionally keeps **0.3.4** as the known-good transcription baseline while the larger local LLM is benchmarked on real hardware. The Qwen GGUF is about **429 MB**, so storage, RAM usage and generation speed must be validated on the target phone before this line is considered stable.
 
 The trade-off is deliberate: Base is larger and may take longer to process than Tiny. The app therefore continues to expose audio duration, useful-voice duration, processing time and RTF so the accuracy/performance balance can be measured on the actual device.
 
@@ -99,7 +99,7 @@ These changes improve both **latency** and **transcription stability** on constr
        └── :core-llm
              ├── LocalQwenTextEngine
              ├── JNI bridge
-             └── llama.cpp + Qwen2.5 0.5B Instruct Q4_K_M
+             └── llama.cpp + Qwen2.5 0.5B Instruct Q4_0
 ```
 
 The UI does not depend directly on Whisper. It talks to the `SpeechToTextEngine` abstraction, which keeps the application replaceable and reusable.
@@ -218,7 +218,7 @@ The objective is not to present AI-generated code as expertise by itself. It is 
 
 Near-term work:
 
-- benchmark Qwen2.5 0.5B Q4_K_M generation speed and RAM usage on the target phone;
+- benchmark Qwen2.5 0.5B Q4_0 generation speed and RAM usage on the target phone;
 - validate the **Improve writing** prompt against real Spanish dictation;
 - validate voice-driven **Write** instructions and formatting requests;
 - compare smaller quantizations only if device constraints require it;
