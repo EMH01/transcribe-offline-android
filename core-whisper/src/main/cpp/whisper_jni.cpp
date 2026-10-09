@@ -89,7 +89,7 @@ Java_com_emh01_transcribe_whisper_WhisperNative_transcribe(
     jfloat *samples = env->GetFloatArrayElements(audioData, nullptr);
     const jsize sampleCount = env->GetArrayLength(audioData);
 
-    whisper_full_params params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
+    whisper_full_params params = whisper_full_default_params(WHISPER_SAMPLING_BEAM_SEARCH);
     params.print_realtime = false;
     params.print_progress = false;
     params.print_timestamps = false;
@@ -102,8 +102,9 @@ Java_com_emh01_transcribe_whisper_WhisperNative_transcribe(
     params.no_timestamps = true;
     params.single_segment = false;
 
-    // Tiny models are prone to continuing into silence. Keep decoding
-    // deterministic and suppress non-speech/blank tokens aggressively.
+    // Keep decoding deterministic and suppress silence-related hallucinations.
+    // A short beam search gives Base a little more room to resolve ambiguous
+    // Spanish speech without the much larger cost of a wide beam.
     params.suppress_blank = true;
     params.suppress_nst = true;
     params.temperature = 0.0f;
@@ -111,6 +112,8 @@ Java_com_emh01_transcribe_whisper_WhisperNative_transcribe(
     params.no_speech_thold = 0.50f;
     params.logprob_thold = -1.0f;
     params.entropy_thold = 2.4f;
+    params.beam_search.beam_size = 3;
+    params.beam_search.patience = 1.0f;
 
     whisper_reset_timings(context);
     const int result = whisper_full(context, params, samples, sampleCount);
