@@ -2,6 +2,21 @@
 
 All notable changes to **Transcribe Offline Android** are documented here.
 
+## 0.3.2 — Conservative vocabulary correction
+
+Status: **experimental device benchmark**
+
+### Added
+
+- Local post-processing that corrects only near-matches against the user vocabulary.
+- Multi-word proper-name recovery such as `Este María` → `Esther María`.
+- Conservative matching thresholds to reduce accidental edits to ordinary words.
+- Canonical casing and accent restoration for vocabulary entries.
+
+### Performance
+
+The correction runs locally after Whisper inference and is negligible compared with model inference time.
+
 ## 0.3.1 — Local vocabulary hints
 
 Status: **experimental device benchmark**
