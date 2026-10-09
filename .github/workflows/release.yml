@@ -2,6 +2,8 @@ name: Publish signed release
 
 on:
   push:
+    branches:
+      - feature/offline-writing-llm
     tags:
       - "v*"
   workflow_dispatch:
