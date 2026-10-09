@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.emh01.transcribe.audio.PcmAudioRecorder
 import com.emh01.transcribe.audio.VoiceActivityTrimmer
+import com.emh01.transcribe.llm.LocalQwenTextEngine
 import com.emh01.transcribe.speech.LocalVocabularyCorrector
 import com.emh01.transcribe.whisper.WhisperBaseEngine
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,6 +17,9 @@ import kotlinx.coroutines.launch
 class TranscribeViewModel(application: Application) : AndroidViewModel(application) {
     private val recorder = PcmAudioRecorder()
     private val speechEngine = WhisperBaseEngine(application)
+    private val textEngineLazy = lazy { LocalQwenTextEngine(application) }
+    private val textEngine by textEngineLazy
+    private val llmAvailable = LocalQwenTextEngine.isSupportedDevice()
     private val preferences = application.getSharedPreferences(
         "transcribe_preferences",
         Application.MODE_PRIVATE,
@@ -26,7 +30,7 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
         DEFAULT_GLOSSARY
     }
 
-    private val _uiState = MutableStateFlow(TranscribeUiState(glossary = glossary))
+    private val _uiState = MutableStateFlow(TranscribeUiState(glossary = glossary, llmAvailable = llmAvailable))
     val uiState: StateFlow<TranscribeUiState> = _uiState.asStateFlow()
 
     fun startRecording() {
@@ -37,6 +41,7 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
         _uiState.value = TranscribeUiState(
             stage = TranscribeStage.Recording,
             glossary = glossary,
+            llmAvailable = llmAvailable,
         )
         recorder.start(
             onAmplitude = { amplitude ->
@@ -53,6 +58,7 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
                     stage = TranscribeStage.Error,
                     errorMessage = error.message ?: "No se pudo usar el micrófono.",
                     glossary = glossary,
+                    llmAvailable = llmAvailable,
                 )
             },
         )
@@ -86,23 +92,95 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
                     originalAudioMs = prepared.originalDurationMs,
                     processedAudioMs = prepared.processedDurationMs,
                     glossary = glossary,
+                    llmAvailable = llmAvailable,
                 )
             }.onFailure { error ->
                 _uiState.value = TranscribeUiState(
                     stage = TranscribeStage.Error,
                     errorMessage = error.message ?: "No se pudo transcribir el audio.",
                     glossary = glossary,
+                    llmAvailable = llmAvailable,
                 )
             }
         }
     }
 
     fun updateText(text: String) {
-        _uiState.update { it.copy(text = text) }
+        _uiState.update {
+            it.copy(
+                text = text,
+                improvementError = null,
+            )
+        }
+    }
+
+    fun improveWriting() {
+        val current = _uiState.value
+        if (current.stage != TranscribeStage.Result ||
+            current.text.isBlank() ||
+            current.isImprovingText
+        ) return
+
+        if (!llmAvailable) {
+            _uiState.update {
+                it.copy(
+                    improvementError =
+                        "La mejora de redacción local necesita un dispositivo Android de 64 bits.",
+                )
+            }
+            return
+        }
+
+        val textToImprove = current.text
+        _uiState.update {
+            it.copy(
+                isImprovingText = true,
+                improvementError = null,
+                originalText = it.originalText ?: textToImprove,
+            )
+        }
+
+        viewModelScope.launch {
+            runCatching {
+                textEngine.improve(
+                    text = textToImprove,
+                    glossary = glossary,
+                )
+            }.onSuccess { result ->
+                _uiState.update {
+                    it.copy(
+                        text = result.text.ifBlank { textToImprove },
+                        isImprovingText = false,
+                        improvementMs = result.elapsedMs,
+                        improvementError = null,
+                    )
+                }
+            }.onFailure { error ->
+                _uiState.update {
+                    it.copy(
+                        isImprovingText = false,
+                        improvementError =
+                            error.message ?: "No se pudo mejorar la redacción localmente.",
+                    )
+                }
+            }
+        }
+    }
+
+    fun restoreOriginalText() {
+        _uiState.update { current ->
+            val original = current.originalText ?: return@update current
+            current.copy(
+                text = original,
+                originalText = null,
+                improvementMs = 0L,
+                improvementError = null,
+            )
+        }
     }
 
     fun reset() {
-        _uiState.value = TranscribeUiState(glossary = glossary)
+        _uiState.value = TranscribeUiState(glossary = glossary, llmAvailable = llmAvailable)
     }
 
     fun saveGlossary(value: String) {
@@ -122,6 +200,9 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
     override fun onCleared() {
         recorder.close()
         speechEngine.close()
+        if (textEngineLazy.isInitialized()) {
+            textEngine.close()
+        }
         super.onCleared()
     }
 }
@@ -143,6 +224,11 @@ data class TranscribeUiState(
     val processedAudioMs: Long = 0L,
     val glossary: String = "",
     val errorMessage: String? = null,
+    val llmAvailable: Boolean = false,
+    val isImprovingText: Boolean = false,
+    val originalText: String? = null,
+    val improvementMs: Long = 0L,
+    val improvementError: String? = null,
 ) {
     val realtimeFactor: Float
         get() = if (processedAudioMs > 0) processingMs.toFloat() / processedAudioMs else 0f
