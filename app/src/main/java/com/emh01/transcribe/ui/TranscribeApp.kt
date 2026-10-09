@@ -66,6 +66,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.emh01.transcribe.TranscribeStage
 import com.emh01.transcribe.TranscribeUiState
 import com.emh01.transcribe.TranscribeViewModel
+import com.emh01.transcribe.WorkspaceMode
 import kotlinx.coroutines.delay
 
 private val LightColors = lightColorScheme(
@@ -123,9 +124,12 @@ fun TranscribeApp(viewModel: TranscribeViewModel = viewModel()) {
         onRecordRequested = onRecordRequested,
         onStop = viewModel::stopAndTranscribe,
         onTextChanged = viewModel::updateText,
+        onInstructionChanged = viewModel::updateInstruction,
         onReset = viewModel::reset,
         onImprove = viewModel::improveWriting,
+        onGenerateDraft = viewModel::generateDraft,
         onRestoreOriginal = viewModel::restoreOriginalText,
+        onModeChange = viewModel::switchMode,
         onGlossaryRequested = {
             glossaryDraft = state.glossary
             showGlossary = true
@@ -180,9 +184,12 @@ private fun TranscribeScreen(
     onRecordRequested: () -> Unit,
     onStop: () -> Unit,
     onTextChanged: (String) -> Unit,
+    onInstructionChanged: (String) -> Unit,
     onReset: () -> Unit,
     onImprove: () -> Unit,
+    onGenerateDraft: () -> Unit,
     onRestoreOriginal: () -> Unit,
+    onModeChange: (WorkspaceMode) -> Unit,
     onGlossaryRequested: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -191,29 +198,41 @@ private fun TranscribeScreen(
         modifier = Modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            Row(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .statusBarsPadding()
-                    .padding(horizontal = 24.dp, vertical = 18.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .padding(horizontal = 24.dp, vertical = 12.dp),
             ) {
-                Column {
-                    Text(
-                        text = "Transcribe",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        text = "Privado · sin conexión",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column {
+                        Text(
+                            text = "Transcribe",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            text = "Privado · sin conexión",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick = onGlossaryRequested) {
+                        Text("Vocabulario")
+                    }
                 }
-                Spacer(Modifier.weight(1f))
-                TextButton(onClick = onGlossaryRequested) {
-                    Text("Vocabulario")
-                }
+
+                Spacer(Modifier.height(8.dp))
+                ModeTabs(
+                    selected = state.mode,
+                    onModeChange = onModeChange,
+                    enabled = state.stage != TranscribeStage.Recording &&
+                        state.stage != TranscribeStage.Processing,
+                )
             }
         },
     ) { padding ->
@@ -231,30 +250,50 @@ private fun TranscribeScreen(
                 label = "transcribe-stage",
             ) { stage ->
                 when (stage) {
-                    TranscribeStage.Idle -> IdleContent(onRecordRequested)
+                    TranscribeStage.Idle -> IdleContent(
+                        mode = state.mode,
+                        onRecordRequested = onRecordRequested,
+                    )
                     TranscribeStage.Recording -> RecordingContent(state, onStop)
-                    TranscribeStage.Processing -> ProcessingContent()
-                    TranscribeStage.Result -> ResultContent(
-                        state = state,
-                        onTextChanged = onTextChanged,
-                        onReset = onReset,
-                        onImprove = onImprove,
-                        onRestoreOriginal = onRestoreOriginal,
-                        onCopy = {
+                    TranscribeStage.Processing -> ProcessingContent(state.mode)
+                    TranscribeStage.Result -> {
+                        val onCopy = {
                             val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
                                 as android.content.ClipboardManager
                             clipboard.setPrimaryClip(
-                                android.content.ClipData.newPlainText("Transcripción", state.text),
+                                android.content.ClipData.newPlainText("Texto", state.text),
                             )
-                        },
-                        onShare = {
+                        }
+                        val onShare = {
                             val intent = Intent(Intent.ACTION_SEND).apply {
                                 type = "text/plain"
                                 putExtra(Intent.EXTRA_TEXT, state.text)
                             }
-                            context.startActivity(Intent.createChooser(intent, "Compartir transcripción"))
-                        },
-                    )
+                            context.startActivity(Intent.createChooser(intent, "Compartir texto"))
+                        }
+
+                        if (state.mode == WorkspaceMode.Transcribe) {
+                            ResultContent(
+                                state = state,
+                                onTextChanged = onTextChanged,
+                                onReset = onReset,
+                                onImprove = onImprove,
+                                onRestoreOriginal = onRestoreOriginal,
+                                onCopy = onCopy,
+                                onShare = onShare,
+                            )
+                        } else {
+                            DraftContent(
+                                state = state,
+                                onInstructionChanged = onInstructionChanged,
+                                onTextChanged = onTextChanged,
+                                onGenerate = onGenerateDraft,
+                                onReset = onReset,
+                                onCopy = onCopy,
+                                onShare = onShare,
+                            )
+                        }
+                    }
                     TranscribeStage.Error -> ErrorContent(
                         message = state.errorMessage.orEmpty(),
                         onReset = onReset,
@@ -266,21 +305,76 @@ private fun TranscribeScreen(
 }
 
 @Composable
-private fun IdleContent(onRecordRequested: () -> Unit) {
+private fun ModeTabs(
+    selected: WorkspaceMode,
+    onModeChange: (WorkspaceMode) -> Unit,
+    enabled: Boolean,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        if (selected == WorkspaceMode.Transcribe) {
+            FilledTonalButton(
+                onClick = { onModeChange(WorkspaceMode.Transcribe) },
+                modifier = Modifier.weight(1f),
+                enabled = enabled,
+            ) {
+                Text("Transcribir")
+            }
+            OutlinedButton(
+                onClick = { onModeChange(WorkspaceMode.Write) },
+                modifier = Modifier.weight(1f),
+                enabled = enabled,
+            ) {
+                Text("Redactar")
+            }
+        } else {
+            OutlinedButton(
+                onClick = { onModeChange(WorkspaceMode.Transcribe) },
+                modifier = Modifier.weight(1f),
+                enabled = enabled,
+            ) {
+                Text("Transcribir")
+            }
+            FilledTonalButton(
+                onClick = { onModeChange(WorkspaceMode.Write) },
+                modifier = Modifier.weight(1f),
+                enabled = enabled,
+            ) {
+                Text("Redactar")
+            }
+        }
+    }
+}
+
+@Composable
+private fun IdleContent(
+    mode: WorkspaceMode,
+    onRecordRequested: () -> Unit,
+) {
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
-            text = "Habla y conviértelo en texto",
+            text = if (mode == WorkspaceMode.Transcribe) {
+                "Habla y conviértelo en texto"
+            } else {
+                "Dime qué quieres redactar"
+            },
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.SemiBold,
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(12.dp))
         Text(
-            text = "El audio se procesa directamente en este teléfono.",
+            text = if (mode == WorkspaceMode.Transcribe) {
+                "El audio se procesa directamente en este teléfono."
+            } else {
+                "Tu orden se transcribe y la IA local redacta el texto sin conexión."
+            },
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -296,7 +390,11 @@ private fun IdleContent(onRecordRequested: () -> Unit) {
         }
         Spacer(Modifier.height(18.dp))
         Text(
-            text = "Toca para hablar",
+            text = if (mode == WorkspaceMode.Transcribe) {
+                "Toca para hablar"
+            } else {
+                "Toca para dictar la orden"
+            },
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Medium,
         )
@@ -311,7 +409,11 @@ private fun RecordingContent(state: TranscribeUiState, onStop: () -> Unit) {
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
-            text = "Grabando",
+            text = if (state.mode == WorkspaceMode.Transcribe) {
+                "Grabando"
+            } else {
+                "Escuchando tu orden"
+            },
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.SemiBold,
         )
@@ -334,7 +436,11 @@ private fun RecordingContent(state: TranscribeUiState, onStop: () -> Unit) {
         }
         Spacer(Modifier.height(18.dp))
         Text(
-            text = "Detener y transcribir",
+            text = if (state.mode == WorkspaceMode.Transcribe) {
+                "Detener y transcribir"
+            } else {
+                "Detener y revisar orden"
+            },
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Medium,
         )
@@ -387,7 +493,7 @@ private fun WaveBars(amplitude: Float) {
 }
 
 @Composable
-private fun ProcessingContent() {
+private fun ProcessingContent(mode: WorkspaceMode) {
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -396,13 +502,21 @@ private fun ProcessingContent() {
         CircularProgressIndicator(modifier = Modifier.size(58.dp))
         Spacer(Modifier.height(28.dp))
         Text(
-            text = "Transcribiendo…",
+            text = if (mode == WorkspaceMode.Transcribe) {
+                "Transcribiendo…"
+            } else {
+                "Preparando la orden…"
+            },
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.SemiBold,
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "Whisper está procesando el audio en el teléfono.",
+            text = if (mode == WorkspaceMode.Transcribe) {
+                "Whisper está procesando el audio en el teléfono."
+            } else {
+                "Whisper está convirtiendo tu instrucción en texto para que puedas revisarla."
+            },
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -541,6 +655,148 @@ private fun ResultContent(
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text("Nueva grabación")
+        }
+    }
+}
+
+@Composable
+private fun DraftContent(
+    state: TranscribeUiState,
+    onInstructionChanged: (String) -> Unit,
+    onTextChanged: (String) -> Unit,
+    onGenerate: () -> Unit,
+    onReset: () -> Unit,
+    onCopy: () -> Unit,
+    onShare: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Text(
+            text = "Redactar",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
+
+        Text(
+            text = "Revisa la orden antes de ejecutarla",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        OutlinedTextField(
+            value = state.instruction,
+            onValueChange = onInstructionChanged,
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Instrucción") },
+            placeholder = {
+                Text("Ej.: Redáctame por puntos las ventajas de trabajar sin conexión…")
+            },
+            minLines = 3,
+            maxLines = 6,
+            shape = RoundedCornerShape(18.dp),
+        )
+
+        AnimatedVisibility(visible = state.processingMs > 0) {
+            Text(
+                text = "Orden transcrita en %.1f s".format(state.processingMs / 1000f),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        Button(
+            onClick = onGenerate,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = state.instruction.isNotBlank() &&
+                state.llmAvailable &&
+                !state.isGeneratingDraft,
+        ) {
+            if (state.isGeneratingDraft) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                )
+                Spacer(Modifier.width(10.dp))
+                Text("Redactando…")
+            } else {
+                Text("✨ Redactar")
+            }
+        }
+
+        if (!state.llmAvailable) {
+            Text(
+                text = "La redacción con IA local requiere un dispositivo Android de 64 bits.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        state.draftError?.let { message ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+
+        if (state.text.isNotBlank()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Resultado",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(Modifier.weight(1f))
+                if (state.draftMs > 0) {
+                    Text(
+                        text = "IA local · %.1f s".format(state.draftMs / 1000f),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            OutlinedTextField(
+                value = state.text,
+                onValueChange = onTextChanged,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                textStyle = MaterialTheme.typography.bodyLarge,
+                shape = RoundedCornerShape(20.dp),
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                FilledTonalButton(
+                    onClick = onCopy,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Copiar")
+                }
+                OutlinedButton(
+                    onClick = onShare,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Compartir")
+                }
+            }
+        } else {
+            Spacer(Modifier.weight(1f))
+        }
+
+        Button(
+            onClick = onReset,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("Nueva orden")
         }
     }
 }
