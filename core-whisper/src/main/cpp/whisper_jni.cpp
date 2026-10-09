@@ -78,7 +78,8 @@ Java_com_emh01_transcribe_whisper_WhisperNative_transcribe(
         jlong contextPtr,
         jfloatArray audioData,
         jint threadCount,
-        jstring language) {
+        jstring language,
+        jstring initialPrompt) {
     auto *context = reinterpret_cast<whisper_context *>(contextPtr);
     if (context == nullptr) {
         throwRuntime(env, "Whisper context is null");
@@ -86,6 +87,9 @@ Java_com_emh01_transcribe_whisper_WhisperNative_transcribe(
     }
 
     const char *languageChars = env->GetStringUTFChars(language, nullptr);
+    const char *promptChars = initialPrompt == nullptr
+            ? nullptr
+            : env->GetStringUTFChars(initialPrompt, nullptr);
     jfloat *samples = env->GetFloatArrayElements(audioData, nullptr);
     const jsize sampleCount = env->GetArrayLength(audioData);
 
@@ -96,6 +100,7 @@ Java_com_emh01_transcribe_whisper_WhisperNative_transcribe(
     params.print_special = false;
     params.translate = false;
     params.language = languageChars;
+    params.initial_prompt = promptChars;
     params.n_threads = std::max(1, static_cast<int>(threadCount));
     params.offset_ms = 0;
     params.no_context = true;
@@ -120,6 +125,9 @@ Java_com_emh01_transcribe_whisper_WhisperNative_transcribe(
 
     env->ReleaseFloatArrayElements(audioData, samples, JNI_ABORT);
     env->ReleaseStringUTFChars(language, languageChars);
+    if (promptChars != nullptr) {
+        env->ReleaseStringUTFChars(initialPrompt, promptChars);
+    }
 
     if (result != 0) {
         throwRuntime(env, "Whisper transcription failed");
