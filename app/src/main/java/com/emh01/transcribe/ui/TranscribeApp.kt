@@ -618,7 +618,7 @@ private fun ResultContent(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "IA local · %.1f s".format(state.improvementMs / 1000f),
+                    text = "Gemma 3 1B · %.1f s".format(state.improvementMs / 1000f),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -754,7 +754,7 @@ private fun DraftContent(
                 Spacer(Modifier.weight(1f))
                 if (state.draftMs > 0) {
                     Text(
-                        text = "IA local · %.1f s".format(state.draftMs / 1000f),
+                        text = "Gemma 3 1B · %.1f s".format(state.draftMs / 1000f),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
