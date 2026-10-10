@@ -64,43 +64,43 @@ fun sha256(file: File): String {
     return digest.digest().joinToString("") { "%02x".format(it) }
 }
 
-val qwenModelUrl =
-    "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_0.gguf"
-val qwenModelSha256 =
-    "7671c0c304e6ce5a7fc577bcb12aba01e2c155cc2efd29b2213c95b18edaf6ed"
-val qwenModel = layout.projectDirectory.file(
-    "src/main/assets/models/qwen2.5-0.5b-instruct-q4_0.gguf",
+val gemmaModelUrl =
+    "https://huggingface.co/ggml-org/gemma-3-1b-it-qat-GGUF/resolve/main/gemma-3-1b-it-qat-Q4_0.gguf"
+val gemmaModelSha256 =
+    "ef60e4e91a738c99ae9976b050657dfe68a4007a0ccca121b55ec0c413dccd58"
+val gemmaModel = layout.projectDirectory.file(
+    "src/main/assets/models/gemma-3-1b-it-qat-Q4_0.gguf",
 ).asFile
 
 tasks.register("prepareLocalTextModel") {
     group = "llm"
-    description = "Downloads and verifies Qwen2.5 0.5B Instruct Q4_0 for offline text improvement."
+    description = "Downloads and verifies Gemma 3 1B IT QAT Q4_0 for offline text improvement."
 
     doLast {
-        qwenModel.parentFile.mkdirs()
+        gemmaModel.parentFile.mkdirs()
 
-        val currentHash = if (qwenModel.exists()) sha256(qwenModel) else null
-        if (currentHash != qwenModelSha256) {
-            if (qwenModel.exists()) qwenModel.delete()
-            logger.lifecycle("Downloading Qwen2.5 0.5B Instruct Q4_0 (about 429 MB)…")
+        val currentHash = if (gemmaModel.exists()) sha256(gemmaModel) else null
+        if (currentHash != gemmaModelSha256) {
+            if (gemmaModel.exists()) gemmaModel.delete()
+            logger.lifecycle("Downloading Gemma 3 1B IT QAT Q4_0 (about 720 MB)…")
 
-            val connection = URI.create(qwenModelUrl).toURL().openConnection().apply {
+            val connection = URI.create(gemmaModelUrl).toURL().openConnection().apply {
                 connectTimeout = 30_000
                 readTimeout = 300_000
                 setRequestProperty("User-Agent", "transcribe-offline-android-build")
             }
             connection.getInputStream().buffered().use { input ->
-                qwenModel.outputStream().buffered(1024 * 1024).use { output ->
+                gemmaModel.outputStream().buffered(1024 * 1024).use { output ->
                     input.copyTo(output, 1024 * 1024)
                 }
             }
         }
 
-        val verifiedHash = sha256(qwenModel)
-        check(verifiedHash == qwenModelSha256) {
-            "Qwen model checksum mismatch. Expected $qwenModelSha256, got $verifiedHash"
+        val verifiedHash = sha256(gemmaModel)
+        check(verifiedHash == gemmaModelSha256) {
+            "Gemma model checksum mismatch. Expected $gemmaModelSha256, got $verifiedHash"
         }
-        logger.lifecycle("Qwen2.5 0.5B Instruct Q4_0 verified and ready for APK packaging.")
+        logger.lifecycle("Gemma 3 1B IT QAT Q4_0 verified and ready for APK packaging.")
     }
 }
 

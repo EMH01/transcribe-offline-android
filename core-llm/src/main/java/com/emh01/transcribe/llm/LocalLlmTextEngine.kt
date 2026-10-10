@@ -13,13 +13,13 @@ import java.util.concurrent.Executors
 import kotlin.math.max
 import kotlin.math.min
 
-class LocalQwenTextEngine(
+class LocalLlmTextEngine(
     context: Context,
     private val modelAssetPath: String = DEFAULT_MODEL_ASSET,
 ) : TextImprovementEngine {
     private val appContext = context.applicationContext
     private val dispatcher = Executors.newSingleThreadExecutor { runnable ->
-        Thread(runnable, "qwen-text-improvement").apply {
+        Thread(runnable, "gemma-text-generation").apply {
             priority = Thread.NORM_PRIORITY - 1
         }
     }.asCoroutineDispatcher()
@@ -44,11 +44,10 @@ class LocalQwenTextEngine(
         val chunks = splitIntoChunks(cleanText)
 
         val improved = chunks.joinToString(separator = "\n\n") { chunk ->
-            val prompt = buildPrompt(chunk, glossary)
             val raw = LlamaNative.generate(
                 modelPtr = ptr,
-                prompt = prompt,
-                maxTokens = MAX_OUTPUT_TOKENS,
+                userPrompt = buildImprovementPrompt(chunk, glossary),
+                maxTokens = MAX_IMPROVEMENT_TOKENS,
                 threadCount = preferredThreadCount(),
             )
             cleanModelOutput(raw).ifBlank { chunk }
@@ -77,10 +76,9 @@ class LocalQwenTextEngine(
 
         val startedAt = SystemClock.elapsedRealtime()
         val ptr = ensureModel()
-        val prompt = buildDraftPrompt(cleanInstruction, glossary)
         val raw = LlamaNative.generate(
             modelPtr = ptr,
-            prompt = prompt,
+            userPrompt = buildDraftPrompt(cleanInstruction, glossary),
             maxTokens = MAX_DRAFT_TOKENS,
             threadCount = preferredThreadCount(),
         )
@@ -95,13 +93,21 @@ class LocalQwenTextEngine(
         if (modelPtr == 0L) {
             val modelFile = ensureModelFile()
             modelPtr = LlamaNative.loadModel(modelFile.absolutePath)
-            check(modelPtr != 0L) { "No se pudo cargar el modelo local de redacción." }
+            check(modelPtr != 0L) { "No se pudo cargar Gemma 3 1B en este dispositivo." }
         }
         return modelPtr
     }
 
     private fun ensureModelFile(): File {
         val modelDir = File(appContext.filesDir, "local-llm").apply { mkdirs() }
+
+        // An alpha update keeps app data. Remove the previous Qwen experiment
+        // so it does not occupy another ~429 MB after Gemma is prepared.
+        LEGACY_MODEL_FILES.forEach { legacyName ->
+            File(modelDir, legacyName).takeIf { it.exists() }?.delete()
+            File(modelDir, "$legacyName.tmp").takeIf { it.exists() }?.delete()
+        }
+
         val target = File(modelDir, MODEL_FILE_NAME)
         if (target.exists() && target.length() > MIN_EXPECTED_MODEL_BYTES) {
             return target
@@ -117,84 +123,75 @@ class LocalQwenTextEngine(
         }
 
         check(temporary.length() > MIN_EXPECTED_MODEL_BYTES) {
-            "La copia local del modelo de redacción está incompleta."
+            "La copia local de Gemma está incompleta."
         }
 
         if (target.exists()) target.delete()
         check(temporary.renameTo(target)) {
-            "No se pudo preparar el modelo local de redacción."
+            "No se pudo preparar Gemma para la redacción local."
         }
         return target
     }
 
-    private fun buildPrompt(text: String, glossary: String): String {
-        val vocabulary = glossary
-            .split(',', ';', '\n')
-            .map(String::trim)
-            .filter(String::isNotEmpty)
-            .joinToString(", ")
-            .ifBlank { "(sin vocabulario adicional)" }
-
-        val system = """
+    private fun buildImprovementPrompt(text: String, glossary: String): String {
+        val vocabulary = normalizedVocabulary(glossary)
+        return """
             Eres un editor de dictado en español.
-            Devuelve únicamente el texto final mejorado, sin explicaciones, títulos ni comentarios.
-            Corrige ortografía, puntuación y redacción ligera.
-            Mantén el significado, los hechos, números y detalles del texto original.
-            No inventes información ni elimines contenido relevante.
-            Conserva exactamente los nombres propios y términos del vocabulario local cuando correspondan.
-            Vocabulario local: $vocabulary
-        """.trimIndent()
 
-        return buildString {
-            append("<|im_start|>system\n")
-            append(system)
-            append("<|im_end|>\n")
-            append("<|im_start|>user\n")
-            append("Mejora este dictado:\n")
-            append(text)
-            append("<|im_end|>\n")
-            append("<|im_start|>assistant\n")
-        }
+            Tarea:
+            - Mejora únicamente ortografía, puntuación, claridad y redacción ligera.
+            - Conserva exactamente el significado, los hechos, números y detalles del original.
+            - No añadas información que no esté en el texto.
+            - No resumas ni elimines contenido relevante.
+            - Si el texto ya está bien, haz solo cambios mínimos.
+            - Devuelve únicamente el texto final, sin explicaciones ni encabezados.
+            - Conserva los nombres propios y términos del vocabulario cuando correspondan.
+
+            Vocabulario local: $vocabulary
+
+            Texto original:
+            $text
+        """.trimIndent()
     }
 
     private fun buildDraftPrompt(instruction: String, glossary: String): String {
-        val vocabulary = glossary
+        val vocabulary = normalizedVocabulary(glossary)
+        return """
+            Eres un asistente de redacción en español.
+
+            Sigue exactamente la instrucción del usuario y escribe el contenido solicitado.
+            Respeta el tono y el formato pedidos: una oración, párrafo, lista por puntos, mensaje, resumen u otro formato.
+            No inventes nombres, fechas, cifras ni hechos que el usuario no haya dado.
+            No uses marcadores como [Nombre del usuario], [fecha] o texto entre corchetes para datos que falten.
+            Si no se proporciona un nombre, redacta naturalmente sin necesitarlo.
+            Conserva los nombres propios y términos del vocabulario cuando correspondan.
+            Devuelve únicamente el texto final solicitado, sin explicar el proceso ni anteponer títulos como "Respuesta:".
+
+            Vocabulario local: $vocabulary
+
+            Instrucción del usuario:
+            $instruction
+        """.trimIndent()
+    }
+
+    private fun normalizedVocabulary(glossary: String): String =
+        glossary
             .split(',', ';', '\n')
             .map(String::trim)
             .filter(String::isNotEmpty)
             .joinToString(", ")
             .ifBlank { "(sin vocabulario adicional)" }
 
-        val system = """
-            Eres un asistente de redacción en español que funciona completamente sin conexión.
-            Sigue la instrucción del usuario y redacta el contenido solicitado.
-            Devuelve únicamente el texto final, sin explicar lo que hiciste ni añadir comentarios.
-            Respeta el formato pedido: párrafos, lista por puntos, mensaje, resumen u otro formato.
-            No inventes datos concretos que el usuario no haya dado.
-            Conserva exactamente los nombres propios y términos del vocabulario local cuando correspondan.
-            Vocabulario local: $vocabulary
-        """.trimIndent()
-
-        return buildString {
-            append("<|im_start|>system\n")
-            append(system)
-            append("<|im_end|>\n")
-            append("<|im_start|>user\n")
-            append(instruction)
-            append("<|im_end|>\n")
-            append("<|im_start|>assistant\n")
-        }
-    }
-
-    private fun cleanModelOutput(raw: String): String {
-        return raw
+    private fun cleanModelOutput(raw: String): String =
+        raw
+            .substringBefore("<end_of_turn>")
             .substringBefore("<|im_end|>")
             .substringBefore("<|endoftext|>")
             .trim()
+            .removePrefix("Respuesta:")
             .removePrefix("Texto mejorado:")
             .removePrefix("Texto corregido:")
             .trim()
-    }
 
     private fun splitIntoChunks(text: String): List<String> {
         if (text.length <= MAX_CHUNK_CHARS) return listOf(text)
@@ -250,15 +247,19 @@ class LocalQwenTextEngine(
 
     companion object {
         const val DEFAULT_MODEL_ASSET =
-            "models/qwen2.5-0.5b-instruct-q4_0.gguf"
+            "models/gemma-3-1b-it-qat-Q4_0.gguf"
 
         private const val MODEL_FILE_NAME =
-            "qwen2.5-0.5b-instruct-q4_0.gguf"
-        private const val MIN_EXPECTED_MODEL_BYTES = 400_000_000L
+            "gemma-3-1b-it-qat-Q4_0.gguf"
+        private const val MIN_EXPECTED_MODEL_BYTES = 680_000_000L
         private const val MAX_CHUNK_CHARS = 2_200
-        private const val MAX_OUTPUT_TOKENS = 512
+        private const val MAX_IMPROVEMENT_TOKENS = 512
         private const val MAX_DRAFT_TOKENS = 768
         private const val MAX_INSTRUCTION_CHARS = 3_000
+        private val LEGACY_MODEL_FILES = listOf(
+            "qwen2.5-0.5b-instruct-q4_0.gguf",
+            "qwen2.5-0.5b-instruct-q4_k_m.gguf",
+        )
 
         fun isSupportedDevice(): Boolean =
             Build.SUPPORTED_64_BIT_ABIS.isNotEmpty()
