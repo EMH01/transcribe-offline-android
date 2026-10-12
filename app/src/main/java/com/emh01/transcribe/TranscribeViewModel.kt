@@ -7,7 +7,7 @@ import com.emh01.transcribe.audio.PcmAudioRecorder
 import com.emh01.transcribe.audio.VoiceActivityTrimmer
 import com.emh01.transcribe.llm.LocalLlmTextEngine
 import com.emh01.transcribe.speech.LocalVocabularyCorrector
-import com.emh01.transcribe.whisper.WhisperBaseEngine
+import com.emh01.transcribe.parakeet.ParakeetEngine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,7 +16,7 @@ import kotlinx.coroutines.launch
 
 class TranscribeViewModel(application: Application) : AndroidViewModel(application) {
     private val recorder = PcmAudioRecorder()
-    private val speechEngine = WhisperBaseEngine(application)
+    private val speechEngine = ParakeetEngine(application)
     private val textEngineLazy = lazy { LocalLlmTextEngine(application) }
     private val textEngine by textEngineLazy
     private val llmAvailable = LocalLlmTextEngine.isSupportedDevice()
