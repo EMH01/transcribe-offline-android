@@ -8,11 +8,11 @@ Status: **experimental UX benchmark**
 
 ### Changed
 
-- Renamed the second workspace from **Redactar** to **Asistente**.
+- Kept the **Redactar** workspace name and changed its interaction model from one-shot generation to a conversational chat.
 - Replaced the one-shot instruction/result screen with a familiar local chat interface.
 - Text can be typed directly or dictated with the microphone beside the send button.
 - Voice input is transcribed by Parakeet into the editable message field before anything is sent to Gemma.
-- Conversation history remains visible when switching between **Transcribir** and **Asistente**.
+- Conversation history remains visible when switching between **Transcribir** and **Redactar**.
 - Gemma receives only the last 6 conversation messages to keep local context bounded and avoid progressively slower prompts.
 - Added **Nueva conversación** without affecting the transcription workspace.
 
