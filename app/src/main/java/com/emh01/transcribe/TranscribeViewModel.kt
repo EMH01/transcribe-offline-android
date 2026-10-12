@@ -6,8 +6,10 @@ import androidx.lifecycle.viewModelScope
 import com.emh01.transcribe.audio.PcmAudioRecorder
 import com.emh01.transcribe.audio.VoiceActivityTrimmer
 import com.emh01.transcribe.llm.LocalLlmTextEngine
-import com.emh01.transcribe.speech.LocalVocabularyCorrector
 import com.emh01.transcribe.parakeet.ParakeetEngine
+import com.emh01.transcribe.speech.LocalVocabularyCorrector
+import com.emh01.transcribe.text.TextChatMessage
+import com.emh01.transcribe.text.TextChatRole
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -44,28 +46,34 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
         val current = _uiState.value
         if (current.mode == mode ||
             current.stage == TranscribeStage.Recording ||
-            current.stage == TranscribeStage.Processing
+            current.stage == TranscribeStage.Processing ||
+            current.chatVoiceState != ChatVoiceState.Idle
         ) return
 
-        _uiState.value = TranscribeUiState(
-            mode = mode,
-            glossary = glossary,
-            llmAvailable = llmAvailable,
-        )
+        _uiState.update {
+            it.copy(
+                mode = mode,
+                stage = TranscribeStage.Idle,
+                errorMessage = null,
+            )
+        }
     }
 
     fun startRecording() {
         val current = _uiState.value
-        if (current.stage == TranscribeStage.Recording ||
-            current.stage == TranscribeStage.Processing
+        if (current.mode != WorkspaceMode.Transcribe ||
+            current.stage == TranscribeStage.Recording ||
+            current.stage == TranscribeStage.Processing ||
+            current.chatVoiceState != ChatVoiceState.Idle
         ) return
 
-        _uiState.value = TranscribeUiState(
-            mode = current.mode,
-            stage = TranscribeStage.Recording,
-            glossary = glossary,
-            llmAvailable = llmAvailable,
-        )
+        _uiState.update {
+            it.copy(
+                stage = TranscribeStage.Recording,
+                amplitude = 0f,
+                errorMessage = null,
+            )
+        }
 
         recorder.start(
             onAmplitude = { amplitude ->
@@ -78,23 +86,23 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
                 }
             },
             onError = { error ->
-                val mode = _uiState.value.mode
-                _uiState.value = TranscribeUiState(
-                    mode = mode,
-                    stage = TranscribeStage.Error,
-                    errorMessage = error.message ?: "No se pudo usar el micrófono.",
-                    glossary = glossary,
-                    llmAvailable = llmAvailable,
-                )
+                _uiState.update {
+                    it.copy(
+                        stage = TranscribeStage.Error,
+                        amplitude = 0f,
+                        errorMessage = error.message ?: "No se pudo usar el micrófono.",
+                    )
+                }
             },
         )
     }
 
     fun stopAndTranscribe() {
         val current = _uiState.value
-        if (current.stage != TranscribeStage.Recording) return
+        if (current.mode != WorkspaceMode.Transcribe ||
+            current.stage != TranscribeStage.Recording
+        ) return
 
-        val mode = current.mode
         _uiState.update {
             it.copy(
                 stage = TranscribeStage.Processing,
@@ -104,57 +112,25 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
 
         viewModelScope.launch {
             runCatching {
-                val samples = recorder.stop()
-                require(samples.isNotEmpty()) { "No se detectó audio." }
-
-                val prepared = VoiceActivityTrimmer.prepare(samples)
-                require(prepared.samples.isNotEmpty()) {
-                    "No se detectó voz suficiente. Acércate un poco al micrófono y vuelve a intentarlo."
-                }
-
-                val result = speechEngine.transcribe(
-                    samples = prepared.samples,
-                    language = "es",
-                    initialPrompt = glossary.takeIf { it.isNotBlank() },
-                )
-
-                Triple(
-                    LocalVocabularyCorrector.correct(result.text, glossary),
-                    result,
-                    prepared,
-                )
-            }.onSuccess { (recognizedText, result, prepared) ->
-                _uiState.value = if (mode == WorkspaceMode.Transcribe) {
-                    TranscribeUiState(
-                        mode = mode,
+                transcribeRecorderAudio()
+            }.onSuccess { payload ->
+                _uiState.update {
+                    it.copy(
                         stage = TranscribeStage.Result,
-                        text = recognizedText,
-                        processingMs = result.elapsedMs,
-                        originalAudioMs = prepared.originalDurationMs,
-                        processedAudioMs = prepared.processedDurationMs,
-                        glossary = glossary,
-                        llmAvailable = llmAvailable,
-                    )
-                } else {
-                    TranscribeUiState(
-                        mode = mode,
-                        stage = TranscribeStage.Result,
-                        instruction = recognizedText,
-                        processingMs = result.elapsedMs,
-                        originalAudioMs = prepared.originalDurationMs,
-                        processedAudioMs = prepared.processedDurationMs,
-                        glossary = glossary,
-                        llmAvailable = llmAvailable,
+                        text = payload.text,
+                        processingMs = payload.processingMs,
+                        originalAudioMs = payload.originalAudioMs,
+                        processedAudioMs = payload.processedAudioMs,
+                        errorMessage = null,
                     )
                 }
             }.onFailure { error ->
-                _uiState.value = TranscribeUiState(
-                    mode = mode,
-                    stage = TranscribeStage.Error,
-                    errorMessage = error.message ?: "No se pudo transcribir el audio.",
-                    glossary = glossary,
-                    llmAvailable = llmAvailable,
-                )
+                _uiState.update {
+                    it.copy(
+                        stage = TranscribeStage.Error,
+                        errorMessage = error.message ?: "No se pudo transcribir el audio.",
+                    )
+                }
             }
         }
     }
@@ -164,18 +140,6 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
             it.copy(
                 text = text,
                 improvementError = null,
-                draftError = null,
-            )
-        }
-    }
-
-    fun updateInstruction(instruction: String) {
-        _uiState.update {
-            it.copy(
-                instruction = instruction,
-                text = "",
-                draftMs = 0L,
-                draftError = null,
             )
         }
     }
@@ -234,59 +198,6 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    fun generateDraft() {
-        val current = _uiState.value
-        if (current.mode != WorkspaceMode.Write ||
-            current.stage != TranscribeStage.Result ||
-            current.instruction.isBlank() ||
-            current.isGeneratingDraft
-        ) return
-
-        if (!llmAvailable) {
-            _uiState.update {
-                it.copy(
-                    draftError =
-                        "La redacción con IA local necesita un dispositivo Android de 64 bits.",
-                )
-            }
-            return
-        }
-
-        val instruction = current.instruction
-        _uiState.update {
-            it.copy(
-                isGeneratingDraft = true,
-                draftError = null,
-            )
-        }
-
-        viewModelScope.launch {
-            runCatching {
-                textEngine.draft(
-                    instruction = instruction,
-                    glossary = glossary,
-                )
-            }.onSuccess { result ->
-                _uiState.update {
-                    it.copy(
-                        text = result.text,
-                        isGeneratingDraft = false,
-                        draftMs = result.elapsedMs,
-                        draftError = null,
-                    )
-                }
-            }.onFailure { error ->
-                _uiState.update {
-                    it.copy(
-                        isGeneratingDraft = false,
-                        draftError =
-                            error.message ?: "No se pudo redactar el texto localmente.",
-                    )
-                }
-            }
-        }
-    }
-
     fun restoreOriginalText() {
         _uiState.update { current ->
             val original = current.originalText ?: return@update current
@@ -299,13 +210,209 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    fun reset() {
-        val mode = _uiState.value.mode
-        _uiState.value = TranscribeUiState(
-            mode = mode,
-            glossary = glossary,
-            llmAvailable = llmAvailable,
+    fun updateChatInput(value: String) {
+        _uiState.update {
+            it.copy(
+                chatInput = value.take(MAX_CHAT_INPUT_CHARS),
+                chatError = null,
+            )
+        }
+    }
+
+    fun startChatRecording() {
+        val current = _uiState.value
+        if (current.mode != WorkspaceMode.Assistant ||
+            current.chatVoiceState != ChatVoiceState.Idle ||
+            current.stage == TranscribeStage.Recording ||
+            current.stage == TranscribeStage.Processing
+        ) return
+
+        _uiState.update {
+            it.copy(
+                chatVoiceState = ChatVoiceState.Recording,
+                chatVoiceAmplitude = 0f,
+                chatError = null,
+            )
+        }
+
+        recorder.start(
+            onAmplitude = { amplitude ->
+                _uiState.update { state ->
+                    if (state.chatVoiceState == ChatVoiceState.Recording) {
+                        state.copy(chatVoiceAmplitude = amplitude)
+                    } else {
+                        state
+                    }
+                }
+            },
+            onError = { error ->
+                _uiState.update {
+                    it.copy(
+                        chatVoiceState = ChatVoiceState.Idle,
+                        chatVoiceAmplitude = 0f,
+                        chatError = error.message ?: "No se pudo usar el micrófono.",
+                    )
+                }
+            },
         )
+    }
+
+    fun stopChatRecording() {
+        val current = _uiState.value
+        if (current.mode != WorkspaceMode.Assistant ||
+            current.chatVoiceState != ChatVoiceState.Recording
+        ) return
+
+        _uiState.update {
+            it.copy(
+                chatVoiceState = ChatVoiceState.Processing,
+                chatVoiceAmplitude = 0f,
+                chatError = null,
+            )
+        }
+
+        viewModelScope.launch {
+            runCatching {
+                transcribeRecorderAudio()
+            }.onSuccess { payload ->
+                _uiState.update { state ->
+                    val combined = listOf(state.chatInput.trim(), payload.text.trim())
+                        .filter(String::isNotEmpty)
+                        .joinToString(" ")
+                        .take(MAX_CHAT_INPUT_CHARS)
+
+                    state.copy(
+                        chatInput = combined,
+                        chatVoiceState = ChatVoiceState.Idle,
+                        chatVoiceProcessingMs = payload.processingMs,
+                        chatVoiceAmplitude = 0f,
+                        chatError = null,
+                    )
+                }
+            }.onFailure { error ->
+                _uiState.update {
+                    it.copy(
+                        chatVoiceState = ChatVoiceState.Idle,
+                        chatVoiceAmplitude = 0f,
+                        chatError =
+                            error.message ?: "No se pudo convertir la voz en texto.",
+                    )
+                }
+            }
+        }
+    }
+
+    fun sendChatMessage() {
+        val current = _uiState.value
+        val input = current.chatInput.trim()
+
+        if (current.mode != WorkspaceMode.Assistant ||
+            input.isEmpty() ||
+            current.isGeneratingChat ||
+            current.chatVoiceState != ChatVoiceState.Idle
+        ) return
+
+        if (!llmAvailable) {
+            _uiState.update {
+                it.copy(
+                    chatError =
+                        "El asistente local necesita un dispositivo Android de 64 bits.",
+                )
+            }
+            return
+        }
+
+        val userMessage = ChatMessage(
+            role = ChatRole.User,
+            text = input,
+        )
+        val conversation = current.chatMessages + userMessage
+
+        _uiState.update {
+            it.copy(
+                chatInput = "",
+                chatMessages = conversation,
+                isGeneratingChat = true,
+                chatError = null,
+            )
+        }
+
+        viewModelScope.launch {
+            runCatching {
+                textEngine.chat(
+                    messages = conversation
+                        .takeLast(MAX_CONTEXT_MESSAGES)
+                        .map { message ->
+                            TextChatMessage(
+                                role = if (message.role == ChatRole.User) {
+                                    TextChatRole.User
+                                } else {
+                                    TextChatRole.Assistant
+                                },
+                                text = message.text,
+                            )
+                        },
+                    glossary = glossary,
+                )
+            }.onSuccess { result ->
+                val answer = result.text.trim()
+                _uiState.update {
+                    it.copy(
+                        chatMessages = it.chatMessages + ChatMessage(
+                            role = ChatRole.Assistant,
+                            text = answer.ifBlank {
+                                "No pude generar una respuesta útil. Inténtalo de nuevo."
+                            },
+                            elapsedMs = result.elapsedMs,
+                        ),
+                        isGeneratingChat = false,
+                        chatError = null,
+                    )
+                }
+            }.onFailure { error ->
+                _uiState.update {
+                    it.copy(
+                        isGeneratingChat = false,
+                        chatError =
+                            error.message ?: "No se pudo generar la respuesta local.",
+                    )
+                }
+            }
+        }
+    }
+
+    fun clearChat() {
+        val current = _uiState.value
+        if (current.isGeneratingChat ||
+            current.chatVoiceState != ChatVoiceState.Idle
+        ) return
+
+        _uiState.update {
+            it.copy(
+                chatInput = "",
+                chatMessages = emptyList(),
+                chatError = null,
+                chatVoiceProcessingMs = 0L,
+            )
+        }
+    }
+
+    fun reset() {
+        _uiState.update {
+            it.copy(
+                stage = TranscribeStage.Idle,
+                text = "",
+                amplitude = 0f,
+                processingMs = 0L,
+                originalAudioMs = 0L,
+                processedAudioMs = 0L,
+                errorMessage = null,
+                isImprovingText = false,
+                originalText = null,
+                improvementMs = 0L,
+                improvementError = null,
+            )
+        }
     }
 
     fun saveGlossary(value: String) {
@@ -315,13 +422,42 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun showMicrophonePermissionError() {
-        val mode = _uiState.value.mode
-        _uiState.value = TranscribeUiState(
-            mode = mode,
-            stage = TranscribeStage.Error,
-            errorMessage = "La app necesita permiso de micrófono para grabar.",
-            glossary = glossary,
-            llmAvailable = llmAvailable,
+        _uiState.update {
+            it.copy(
+                stage = TranscribeStage.Error,
+                errorMessage = "La app necesita permiso de micrófono para grabar.",
+            )
+        }
+    }
+
+    fun showChatMicrophonePermissionError() {
+        _uiState.update {
+            it.copy(
+                chatError = "La app necesita permiso de micrófono para dictar mensajes.",
+            )
+        }
+    }
+
+    private suspend fun transcribeRecorderAudio(): SpeechPayload {
+        val samples = recorder.stop()
+        require(samples.isNotEmpty()) { "No se detectó audio." }
+
+        val prepared = VoiceActivityTrimmer.prepare(samples)
+        require(prepared.samples.isNotEmpty()) {
+            "No se detectó voz suficiente. Acércate un poco al micrófono y vuelve a intentarlo."
+        }
+
+        val result = speechEngine.transcribe(
+            samples = prepared.samples,
+            language = "es",
+            initialPrompt = glossary.takeIf { it.isNotBlank() },
+        )
+
+        return SpeechPayload(
+            text = LocalVocabularyCorrector.correct(result.text, glossary),
+            processingMs = result.elapsedMs,
+            originalAudioMs = prepared.originalDurationMs,
+            processedAudioMs = prepared.processedDurationMs,
         )
     }
 
@@ -337,7 +473,7 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
 
 enum class WorkspaceMode {
     Transcribe,
-    Write,
+    Assistant,
 }
 
 enum class TranscribeStage {
@@ -348,11 +484,27 @@ enum class TranscribeStage {
     Error,
 }
 
+enum class ChatVoiceState {
+    Idle,
+    Recording,
+    Processing,
+}
+
+enum class ChatRole {
+    User,
+    Assistant,
+}
+
+data class ChatMessage(
+    val role: ChatRole,
+    val text: String,
+    val elapsedMs: Long = 0L,
+)
+
 data class TranscribeUiState(
     val mode: WorkspaceMode = WorkspaceMode.Transcribe,
     val stage: TranscribeStage = TranscribeStage.Idle,
     val text: String = "",
-    val instruction: String = "",
     val amplitude: Float = 0f,
     val processingMs: Long = 0L,
     val originalAudioMs: Long = 0L,
@@ -364,9 +516,13 @@ data class TranscribeUiState(
     val originalText: String? = null,
     val improvementMs: Long = 0L,
     val improvementError: String? = null,
-    val isGeneratingDraft: Boolean = false,
-    val draftMs: Long = 0L,
-    val draftError: String? = null,
+    val chatInput: String = "",
+    val chatMessages: List<ChatMessage> = emptyList(),
+    val isGeneratingChat: Boolean = false,
+    val chatError: String? = null,
+    val chatVoiceState: ChatVoiceState = ChatVoiceState.Idle,
+    val chatVoiceAmplitude: Float = 0f,
+    val chatVoiceProcessingMs: Long = 0L,
 ) {
     val realtimeFactor: Float
         get() = if (processedAudioMs > 0) {
@@ -376,7 +532,16 @@ data class TranscribeUiState(
         }
 }
 
+private data class SpeechPayload(
+    val text: String,
+    val processingMs: Long,
+    val originalAudioMs: Long,
+    val processedAudioMs: Long,
+)
+
 private const val KEY_GLOSSARY = "local_glossary"
 private const val MAX_GLOSSARY_CHARS = 500
+private const val MAX_CHAT_INPUT_CHARS = 3_000
+private const val MAX_CONTEXT_MESSAGES = 6
 private const val DEFAULT_GLOSSARY =
     "Esther María, Amarilys, Rodovaldo, Guillermina, Alejandro, Martín, Romel, Daniel"
