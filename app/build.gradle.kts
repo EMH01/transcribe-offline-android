@@ -54,6 +54,13 @@ android {
         compose = true
     }
 
+    androidResources {
+        // Whisper models are already quantized binary data. Keeping them
+        // uncompressed avoids huge in-memory ZIP compression during packaging
+        // and lets Android stream the asset directly.
+        noCompress += "bin"
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
