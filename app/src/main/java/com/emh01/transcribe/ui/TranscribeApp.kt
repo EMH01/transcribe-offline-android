@@ -272,7 +272,7 @@ private fun TranscribeScreen(
                 .imePadding()
                 .padding(horizontal = 24.dp, vertical = 12.dp),
         ) {
-            if (state.mode == WorkspaceMode.Assistant) {
+            if (state.mode == WorkspaceMode.Chat) {
                 AssistantContent(
                     state = state,
                     onInputChanged = onChatInputChanged,
@@ -352,11 +352,11 @@ private fun ModeTabs(
                 Text("Transcribir")
             }
             OutlinedButton(
-                onClick = { onModeChange(WorkspaceMode.Assistant) },
+                onClick = { onModeChange(WorkspaceMode.Chat) },
                 modifier = Modifier.weight(1f),
                 enabled = enabled,
             ) {
-                Text("Redactar")
+                Text("Chat")
             }
         } else {
             OutlinedButton(
@@ -367,11 +367,11 @@ private fun ModeTabs(
                 Text("Transcribir")
             }
             FilledTonalButton(
-                onClick = { onModeChange(WorkspaceMode.Assistant) },
+                onClick = { onModeChange(WorkspaceMode.Chat) },
                 modifier = Modifier.weight(1f),
                 enabled = enabled,
             ) {
-                Text("Redactar")
+                Text("Chat")
             }
         }
     }
@@ -405,7 +405,7 @@ private fun AssistantContent(
         ) {
             Column {
                 Text(
-                    text = "Redactar",
+                    text = "Chat",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.SemiBold,
                 )
