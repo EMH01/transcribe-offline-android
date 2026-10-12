@@ -26,14 +26,14 @@ The goal is not to reproduce a large cloud AI stack on a low-end phone. It is to
 - **Modular architecture** — the speech stack can later be reused by a fully local LLM assistant.
 - **Reproducible builds** — the model and `whisper.cpp` revision are pinned and verified.
 
-## Current experiment: 0.4.0-alpha4
+## Current experiment: 0.4.0-alpha5
 
-Version **0.4.0-alpha4** keeps **Gemma 3 1B IT QAT Q4_0 unchanged** and changes only the speech recognizer from Whisper to **NVIDIA Parakeet TDT 0.6B v3 Q4_0** for a direct on-device ASR comparison.
+Version **0.4.0-alpha5** keeps the successful **Parakeet TDT 0.6B v3 Q4_0 + Gemma 3 1B IT QAT Q4_0** pairing and changes only the conversational UX.
 
 The app now has two clearly separated modes:
 
 - **Transcribe** — record speech, obtain editable local transcription, and optionally use **✨ Improve writing** to clean punctuation and wording without changing the intended meaning.
-- **Write** — dictate a writing instruction such as “redáctame por puntos…”; Parakeet converts the instruction to editable text, then the local LLM generates the requested text.
+- **Chat** — type normally or tap the microphone to dictate a message. Parakeet puts the recognized text into the editable composer first; nothing is sent to Gemma until the user presses send. The last 6 messages provide bounded conversational context.
 
 The existing editable local vocabulary still feeds the local correction layer and the LLM. Parakeet itself does not expose Whisper-style prompt biasing, so this experiment deliberately measures its raw ASR behavior plus the same conservative post-correction already used by the app. The Android manifest still contains no `INTERNET` permission: both speech recognition and text generation run on-device after installation.
 
@@ -112,7 +112,7 @@ The Android manifest intentionally contains **no `INTERNET` permission**.
 
 At build time, the development machine obtains the native inference sources and model weights needed for the selected build. Parakeet Q4_0 and the Gemma GGUF are SHA-256 verified before packaging.
 
-The final APK contains both model families and native inference code. On the phone, transcription, writing improvement and instruction-driven drafting therefore remain available in airplane mode.
+The final APK contains both model families and native inference code. On the phone, transcription, writing improvement and multi-turn chat therefore remain available in airplane mode.
 
 ## Model
 
@@ -158,12 +158,12 @@ This makes performance work measurable rather than subjective.
 
 The interface is intentionally small and direct:
 
-- two clear workspaces: **Transcribe** and **Write**;
+- two clear workspaces: **Transcribe** and **Chat**;
 - large primary recording action;
 - clear recording state and timer;
 - lightweight audio-level visualization;
 - explicit processing state;
-- editable transcription or writing instruction before local generation;
+- editable transcription plus a familiar chat composer with optional voice dictation;
 - optional **Improve writing** action after transcription;
 - editable generated result;
 - copy and share actions;
@@ -220,7 +220,7 @@ Near-term work:
 
 - compare Parakeet TDT 0.6B v3 Q4_0 accuracy and RTF against the validated Whisper Base result and the too-slow Whisper Large V3 Turbo result;
 - validate the **Improve writing** prompt against real Spanish dictation;
-- validate voice-driven **Write** instructions and formatting requests;
+- validate multi-turn **Chat** conversations, voice-dictated messages and bounded context on real hardware;
 - compare smaller quantizations only if device constraints require it;
 - improve long-recording behavior;
 - add local transcription history.
