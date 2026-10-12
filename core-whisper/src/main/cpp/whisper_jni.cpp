@@ -108,8 +108,8 @@ Java_com_emh01_transcribe_whisper_WhisperNative_transcribe(
     params.single_segment = false;
 
     // Keep decoding deterministic and suppress silence-related hallucinations.
-    // A short beam search gives Base a little more room to resolve ambiguous
-    // Spanish speech without the much larger cost of a wide beam.
+    // Keep the same short beam used by the Base benchmark so this experiment
+    // isolates the model change rather than changing decoding at the same time.
     params.suppress_blank = true;
     params.suppress_nst = true;
     params.temperature = 0.0f;
