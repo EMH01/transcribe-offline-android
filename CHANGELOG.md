@@ -2,6 +2,31 @@
 
 All notable changes to **Transcribe Offline Android** are documented here.
 
+## 0.4.0-alpha3 — Whisper Large V3 Turbo benchmark
+
+Status: **experimental device benchmark**
+
+### Changed
+
+- Replaced Whisper Base Q5_1 with **Whisper Large V3 Turbo Q5_0**.
+- Kept **Gemma 3 1B IT QAT Q4_0 unchanged** from alpha2.
+- Kept the same VAD, Spanish language setting, vocabulary prompt, deterministic temperature, silence suppression and beam size 3 so the ASR model is the only meaningful inference change.
+- Generalized the Android speech engine name from `WhisperBaseEngine` to `WhisperEngine`.
+
+### Model
+
+- File: `ggml-large-v3-turbo-q5_0.bin`
+- Size: 574,041,195 bytes (~547 MiB)
+- SHA-256: `394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2`
+
+### Goal
+
+Determine whether the substantially larger Turbo model gives a meaningful real-device improvement in Spanish dictation, proper names and robustness without making latency or storage impractical.
+
+### Privacy
+
+No runtime network dependency is introduced. The Android manifest still requests no `INTERNET` permission.
+
 ## 0.4.0-alpha2 — Gemma 3 1B writing benchmark
 
 Status: **experimental device benchmark**
