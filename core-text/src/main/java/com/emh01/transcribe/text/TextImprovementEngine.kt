@@ -10,9 +10,24 @@ interface TextImprovementEngine : AutoCloseable {
         instruction: String,
         glossary: String = "",
     ): TextImprovementResult
+
+    suspend fun chat(
+        messages: List<TextChatMessage>,
+        glossary: String = "",
+    ): TextImprovementResult
 }
 
 data class TextImprovementResult(
     val text: String,
     val elapsedMs: Long,
 )
+
+data class TextChatMessage(
+    val role: TextChatRole,
+    val text: String,
+)
+
+enum class TextChatRole {
+    User,
+    Assistant,
+}
