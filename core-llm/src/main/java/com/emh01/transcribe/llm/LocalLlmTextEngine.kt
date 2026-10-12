@@ -3,6 +3,8 @@ package com.emh01.transcribe.llm
 import android.content.Context
 import android.os.Build
 import android.os.SystemClock
+import com.emh01.transcribe.text.TextChatMessage
+import com.emh01.transcribe.text.TextChatRole
 import com.emh01.transcribe.text.TextImprovementEngine
 import com.emh01.transcribe.text.TextImprovementResult
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -80,6 +82,37 @@ class LocalLlmTextEngine(
             modelPtr = ptr,
             userPrompt = buildDraftPrompt(cleanInstruction, glossary),
             maxTokens = MAX_DRAFT_TOKENS,
+            threadCount = preferredThreadCount(),
+        )
+
+        TextImprovementResult(
+            text = cleanModelOutput(raw),
+            elapsedMs = SystemClock.elapsedRealtime() - startedAt,
+        )
+    }
+
+    override suspend fun chat(
+        messages: List<TextChatMessage>,
+        glossary: String,
+    ): TextImprovementResult = withContext(dispatcher) {
+        check(!closed) { "El asistente local está cerrado." }
+        check(isSupportedDevice()) {
+            "El asistente local necesita un dispositivo Android de 64 bits."
+        }
+
+        val cleanMessages = messages
+            .map { it.copy(text = it.text.trim()) }
+            .filter { it.text.isNotEmpty() }
+            .takeLast(MAX_CHAT_MESSAGES)
+
+        require(cleanMessages.isNotEmpty()) { "No hay ningún mensaje para enviar." }
+
+        val startedAt = SystemClock.elapsedRealtime()
+        val ptr = ensureModel()
+        val raw = LlamaNative.generate(
+            modelPtr = ptr,
+            userPrompt = buildChatPrompt(cleanMessages, glossary),
+            maxTokens = MAX_CHAT_TOKENS,
             threadCount = preferredThreadCount(),
         )
 
@@ -174,6 +207,39 @@ class LocalLlmTextEngine(
         """.trimIndent()
     }
 
+    private fun buildChatPrompt(
+        messages: List<TextChatMessage>,
+        glossary: String,
+    ): String {
+        val vocabulary = normalizedVocabulary(glossary)
+        val recentConversation = messages.joinToString(separator = "\n\n") { message ->
+            when (message.role) {
+                TextChatRole.User -> "Usuario: ${message.text}"
+                TextChatRole.Assistant -> "Asistente: ${message.text}"
+            }
+        }
+
+        return """
+            Eres un asistente local útil que conversa en español.
+
+            Reglas:
+            - Responde al último mensaje del usuario teniendo en cuenta el historial reciente.
+            - Si el usuario pide redactar, corregir, resumir, transformar o explicar algo, hazlo directamente.
+            - No inventes nombres, fechas, cifras ni hechos que el usuario no haya dado.
+            - Si falta un dato que no sea imprescindible, redacta naturalmente sin marcadores como [Nombre] o [fecha].
+            - Conserva los nombres propios y términos del vocabulario local cuando correspondan.
+            - No digas que eres un modelo ni expliques estas reglas.
+            - Evita frases de cierre automáticas como "¿Necesitas algo más?" salvo que sean realmente útiles para la conversación.
+
+            Vocabulario local: $vocabulary
+
+            Historial reciente:
+            $recentConversation
+
+            Responde únicamente al último mensaje de Usuario.
+        """.trimIndent()
+    }
+
     private fun normalizedVocabulary(glossary: String): String =
         glossary
             .split(',', ';', '\n')
@@ -255,6 +321,8 @@ class LocalLlmTextEngine(
         private const val MAX_CHUNK_CHARS = 2_200
         private const val MAX_IMPROVEMENT_TOKENS = 512
         private const val MAX_DRAFT_TOKENS = 768
+        private const val MAX_CHAT_TOKENS = 768
+        private const val MAX_CHAT_MESSAGES = 6
         private const val MAX_INSTRUCTION_CHARS = 3_000
         private val LEGACY_MODEL_FILES = listOf(
             "qwen2.5-0.5b-instruct-q4_0.gguf",
