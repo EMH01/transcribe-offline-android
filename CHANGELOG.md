@@ -2,6 +2,21 @@
 
 All notable changes to **Transcribe Offline Android** are documented here.
 
+## 0.4.0-alpha3b — Whisper Turbo greedy latency test
+
+Status: **experimental device benchmark**
+
+### Changed
+
+- Keeps **Whisper Large V3 Turbo Q5_0** and **Gemma 3 1B** unchanged.
+- Replaces beam search (beam size 3) with deterministic **greedy decoding**.
+- Sets `greedy.best_of = 1` so Whisper evaluates one decoding candidate instead of the default multi-candidate greedy search.
+- Keeps Spanish, VAD, local vocabulary prompt, silence suppression and all other transcription settings unchanged.
+
+### Goal
+
+Measure how much of alpha3's observed ~5.7× RTF came from decoding search versus the model's encoder/decoder cost itself.
+
 ## 0.4.0-alpha3 — Whisper Large V3 Turbo benchmark
 
 Status: **experimental device benchmark**
