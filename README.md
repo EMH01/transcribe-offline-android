@@ -4,7 +4,7 @@
 
 It is intended for people and environments where reliable access to cloud AI cannot be assumed: intermittent or expensive connectivity, slow networks, older hardware, limited infrastructure, or regions and networks where modern online services are unavailable or restricted.
 
-The app records speech locally and transcribes it with **Whisper Base multilingual Q5_1** through `whisper.cpp`. Once installed, it requires **no account, API key, server, cloud service, or Internet connection** to perform transcription.
+The app records speech locally and transcribes it with **Whisper Large V3 Turbo Q5_0** through `whisper.cpp` in the current benchmark. Once installed, it requires **no account, API key, server, cloud service, or Internet connection** to perform transcription.
 
 ## Why this project exists
 
@@ -26,9 +26,9 @@ The goal is not to reproduce a large cloud AI stack on a low-end phone. It is to
 - **Modular architecture** — the speech stack can later be reused by a fully local LLM assistant.
 - **Reproducible builds** — the model and `whisper.cpp` revision are pinned and verified.
 
-## Current experiment: 0.4.0-alpha2
+## Current experiment: 0.4.0-alpha3
 
-Version **0.4.0-alpha2** keeps the validated Whisper Base Q5_1 transcription pipeline and replaces the first 0.5B writing experiment with **Gemma 3 1B IT QAT Q4_0** through `llama.cpp`.
+Version **0.4.0-alpha3** keeps **Gemma 3 1B IT QAT Q4_0 exactly as in alpha2** and changes only speech recognition from Whisper Base Q5_1 to **Whisper Large V3 Turbo Q5_0**. This isolates the ASR model change for a direct real-device comparison.
 
 The app now has two clearly separated modes:
 
@@ -37,9 +37,9 @@ The app now has two clearly separated modes:
 
 The existing editable local vocabulary is shared by both Whisper and the local LLM so uncommon names and terms can be preserved across transcription and writing. The Android manifest still contains no `INTERNET` permission: both speech recognition and text generation run on-device after installation.
 
-The first 0.4.0 alpha proved that the architecture works fully offline, but Qwen2.5 0.5B was too weak for reliable instruction-driven drafting on the target phone. Alpha2 keeps the same UI and flow so **Gemma 3 1B** can be compared directly. Its Q4_0 GGUF is about **720 MB**, so storage, RAM usage and generation speed must be validated on the same device before this line is considered stable.
+The first 0.4.0 alpha proved that the architecture works fully offline, but Qwen2.5 0.5B was too weak for reliable instruction-driven drafting on the target phone. Alpha2 established Gemma 3 1B as the stronger local writing candidate. Alpha3 deliberately leaves that LLM, the UI, vocabulary, VAD and Whisper decoding parameters unchanged while benchmarking the larger Turbo speech model. The Turbo Q5_0 file is about **547 MiB**, so the combined offline APK is substantially larger and must be judged on accuracy as well as latency and storage.
 
-The trade-off is deliberate: Base is larger and may take longer to process than Tiny. The app therefore continues to expose audio duration, useful-voice duration, processing time and RTF so the accuracy/performance balance can be measured on the actual device.
+The trade-off is deliberate: Large V3 Turbo Q5_0 is far larger than Base and may take longer to process on older CPUs. The app therefore continues to expose audio duration, useful-voice duration, processing time and RTF so the accuracy/performance balance can be measured on the actual device.
 
 ## Stable baseline: 0.2.1
 
@@ -89,7 +89,7 @@ These changes improve both **latency** and **transcription stability** on constr
        │     └── SpeechToTextEngine contract
        │
        ├── :core-whisper
-       │     ├── WhisperBaseEngine
+       │     ├── WhisperEngine
        │     ├── JNI bridge
        │     └── whisper.cpp
        │
@@ -110,18 +110,18 @@ That separation is intentional: a future local assistant can reuse `core-audio`,
 
 The Android manifest intentionally contains **no `INTERNET` permission**.
 
-At build time, the development machine obtains the native inference sources and model weights needed for the selected build. Whisper Base and the Gemma GGUF are SHA-256 verified before packaging.
+At build time, the development machine obtains the native inference sources and model weights needed for the selected build. Whisper Large V3 Turbo Q5_0 and the Gemma GGUF are SHA-256 verified before packaging.
 
 The final APK contains both model families and native inference code. On the phone, transcription, writing improvement and instruction-driven drafting therefore remain available in airplane mode.
 
 ## Model
 
-- **Model:** `ggml-base-q5_1.bin`
-- **Family:** Whisper Base multilingual
-- **Quantization:** Q5_1
-- **Approximate model size:** 60 MB
+- **Model:** `ggml-large-v3-turbo-q5_0.bin`
+- **Family:** Whisper Large V3 Turbo multilingual
+- **Quantization:** Q5_0
+- **Model size:** 574,041,195 bytes (~547 MiB)
 - **Runtime language:** Spanish (`es`)
-- **SHA-256:** `422f1ae452ade6f30a004d7e5c6a43195e4433bc370bf23fac9cc591f01a8898`
+- **SHA-256:** `394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2`
 
 The model binary is not committed to Git. Gradle downloads and verifies it before packaging it under `assets/models/`.
 
@@ -218,7 +218,7 @@ The objective is not to present AI-generated code as expertise by itself. It is 
 
 Near-term work:
 
-- compare Gemma 3 1B generation quality and latency against the observed Qwen2.5 0.5B alpha1 result;
+- compare Whisper Large V3 Turbo Q5_0 accuracy, names, hallucinations and RTF against the alpha2 Base Q5_1 result;
 - validate the **Improve writing** prompt against real Spanish dictation;
 - validate voice-driven **Write** instructions and formatting requests;
 - compare smaller quantizations only if device constraints require it;
