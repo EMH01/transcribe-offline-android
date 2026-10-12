@@ -22,3 +22,5 @@ include(":core-whisper")
 
 include(":core-text")
 include(":core-llm")
+
+include(":core-parakeet")
