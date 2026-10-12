@@ -356,7 +356,7 @@ private fun ModeTabs(
                 modifier = Modifier.weight(1f),
                 enabled = enabled,
             ) {
-                Text("Asistente")
+                Text("Redactar")
             }
         } else {
             OutlinedButton(
@@ -371,7 +371,7 @@ private fun ModeTabs(
                 modifier = Modifier.weight(1f),
                 enabled = enabled,
             ) {
-                Text("Asistente")
+                Text("Redactar")
             }
         }
     }
@@ -405,7 +405,7 @@ private fun AssistantContent(
         ) {
             Column {
                 Text(
-                    text = "Asistente",
+                    text = "Redactar",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.SemiBold,
                 )
