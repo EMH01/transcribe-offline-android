@@ -221,7 +221,7 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
 
     fun startChatRecording() {
         val current = _uiState.value
-        if (current.mode != WorkspaceMode.Assistant ||
+        if (current.mode != WorkspaceMode.Chat ||
             current.chatVoiceState != ChatVoiceState.Idle ||
             current.stage == TranscribeStage.Recording ||
             current.stage == TranscribeStage.Processing
@@ -259,7 +259,7 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
 
     fun stopChatRecording() {
         val current = _uiState.value
-        if (current.mode != WorkspaceMode.Assistant ||
+        if (current.mode != WorkspaceMode.Chat ||
             current.chatVoiceState != ChatVoiceState.Recording
         ) return
 
@@ -306,7 +306,7 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
         val current = _uiState.value
         val input = current.chatInput.trim()
 
-        if (current.mode != WorkspaceMode.Assistant ||
+        if (current.mode != WorkspaceMode.Chat ||
             input.isEmpty() ||
             current.isGeneratingChat ||
             current.chatVoiceState != ChatVoiceState.Idle
@@ -473,7 +473,7 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
 
 enum class WorkspaceMode {
     Transcribe,
-    Assistant,
+    Chat,
 }
 
 enum class TranscribeStage {
