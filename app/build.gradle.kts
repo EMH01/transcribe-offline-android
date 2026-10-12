@@ -23,8 +23,8 @@ android {
         applicationId = "com.emh01.transcribeoffline"
         minSdk = 26
         targetSdk = 35
-        versionCode = 10
-        versionName = "0.4.0-alpha2"
+        versionCode = 11
+        versionName = "0.4.0-alpha3"
     }
 
     signingConfigs {
@@ -105,28 +105,39 @@ fun sha256(file: File): String {
 }
 
 val whisperModelUrl =
-    "https://huggingface.co/ggerganov/whisper.cpp/resolve/f281eb45af861ab5e5297d23694b7d46e090c02c/ggml-base-q5_1.bin"
+    "https://huggingface.co/ggerganov/whisper.cpp/resolve/98aa99a0a9db05ae2342309f5096248665f7cba3/ggml-large-v3-turbo-q5_0.bin"
 val whisperModelSha256 =
-    "422f1ae452ade6f30a004d7e5c6a43195e4433bc370bf23fac9cc591f01a8898"
+    "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2"
 val whisperModel = layout.projectDirectory.file(
-    "src/main/assets/models/ggml-base-q5_1.bin",
+    "src/main/assets/models/ggml-large-v3-turbo-q5_0.bin",
 ).asFile
 
 tasks.register("prepareWhisperModel") {
     group = "whisper"
-    description = "Downloads and verifies Whisper Base Q5_1 for packaging in the APK."
+    description = "Downloads and verifies Whisper Large V3 Turbo Q5_0 for packaging in the APK."
 
     doLast {
         whisperModel.parentFile.mkdirs()
 
+        // Avoid accidentally packaging a previous experiment model when
+        // building repeatedly in the same local checkout.
+        listOf(
+            "ggml-base-q5_1.bin",
+            "ggml-tiny-q5_1.bin",
+        ).forEach { previous ->
+            layout.projectDirectory.file("src/main/assets/models/$previous").asFile
+                .takeIf { it.exists() }
+                ?.delete()
+        }
+
         val currentHash = if (whisperModel.exists()) sha256(whisperModel) else null
         if (currentHash != whisperModelSha256) {
             if (whisperModel.exists()) whisperModel.delete()
-            logger.lifecycle("Downloading Whisper Base Q5_1 (about 60 MB)…")
+            logger.lifecycle("Downloading Whisper Large V3 Turbo Q5_0 (about 547 MiB)…")
 
             val connection = URI.create(whisperModelUrl).toURL().openConnection().apply {
                 connectTimeout = 30_000
-                readTimeout = 120_000
+                readTimeout = 600_000
                 setRequestProperty("User-Agent", "transcribe-offline-android-build")
             }
             connection.getInputStream().buffered().use { input ->
@@ -140,7 +151,7 @@ tasks.register("prepareWhisperModel") {
         check(verifiedHash == whisperModelSha256) {
             "Whisper model checksum mismatch. Expected $whisperModelSha256, got $verifiedHash"
         }
-        logger.lifecycle("Whisper Base Q5_1 verified and ready for APK packaging.")
+        logger.lifecycle("Whisper Large V3 Turbo Q5_0 verified and ready for APK packaging.")
     }
 }
 
