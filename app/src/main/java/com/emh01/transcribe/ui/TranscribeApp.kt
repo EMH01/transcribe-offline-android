@@ -143,7 +143,7 @@ fun TranscribeApp(viewModel: TranscribeViewModel = viewModel()) {
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        text = "Añade nombres propios y palabras que Whisper y la IA local deban conservar con precisión. Se guarda solo en este teléfono.",
+                        text = "Añade nombres propios y palabras que el reconocimiento de voz y la IA local deban conservar con precisión. Se guarda solo en este teléfono.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -513,9 +513,9 @@ private fun ProcessingContent(mode: WorkspaceMode) {
         Spacer(Modifier.height(8.dp))
         Text(
             text = if (mode == WorkspaceMode.Transcribe) {
-                "Whisper está procesando el audio en el teléfono."
+                "Parakeet está procesando el audio en el teléfono."
             } else {
-                "Whisper está convirtiendo tu instrucción en texto para que puedas revisarla."
+                "Parakeet está convirtiendo tu instrucción en texto para que puedas revisarla."
             },
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
