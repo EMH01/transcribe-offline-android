@@ -25,6 +25,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -34,7 +37,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -46,12 +48,12 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -63,6 +65,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.emh01.transcribe.ChatMessage
+import com.emh01.transcribe.ChatRole
+import com.emh01.transcribe.ChatVoiceState
 import com.emh01.transcribe.TranscribeStage
 import com.emh01.transcribe.TranscribeUiState
 import com.emh01.transcribe.TranscribeViewModel
@@ -102,34 +107,55 @@ fun TranscribeApp(viewModel: TranscribeViewModel = viewModel()) {
     val context = LocalContext.current
     var showGlossary by remember { mutableStateOf(false) }
     var glossaryDraft by remember(state.glossary) { mutableStateOf(state.glossary) }
+    var pendingChatMic by remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
-        if (granted) viewModel.startRecording()
-        else viewModel.showMicrophonePermissionError()
+        if (granted) {
+            if (pendingChatMic) viewModel.startChatRecording()
+            else viewModel.startRecording()
+        } else {
+            if (pendingChatMic) viewModel.showChatMicrophonePermissionError()
+            else viewModel.showMicrophonePermissionError()
+        }
+        pendingChatMic = false
     }
 
-    val onRecordRequested = {
+    fun requestMic(forChat: Boolean) {
         val granted = ContextCompat.checkSelfPermission(
             context,
             Manifest.permission.RECORD_AUDIO,
         ) == PackageManager.PERMISSION_GRANTED
-        if (granted) viewModel.startRecording()
-        else permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+
+        if (granted) {
+            if (forChat) viewModel.startChatRecording()
+            else viewModel.startRecording()
+        } else {
+            pendingChatMic = forChat
+            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
     }
 
     TranscribeScreen(
         state = state,
-        onRecordRequested = onRecordRequested,
+        onRecordRequested = { requestMic(false) },
         onStop = viewModel::stopAndTranscribe,
         onTextChanged = viewModel::updateText,
-        onInstructionChanged = viewModel::updateInstruction,
         onReset = viewModel::reset,
         onImprove = viewModel::improveWriting,
-        onGenerateDraft = viewModel::generateDraft,
         onRestoreOriginal = viewModel::restoreOriginalText,
         onModeChange = viewModel::switchMode,
+        onChatInputChanged = viewModel::updateChatInput,
+        onChatMic = {
+            if (state.chatVoiceState == ChatVoiceState.Recording) {
+                viewModel.stopChatRecording()
+            } else if (state.chatVoiceState == ChatVoiceState.Idle) {
+                requestMic(true)
+            }
+        },
+        onSendChat = viewModel::sendChatMessage,
+        onClearChat = viewModel::clearChat,
         onGlossaryRequested = {
             glossaryDraft = state.glossary
             showGlossary = true
@@ -143,7 +169,7 @@ fun TranscribeApp(viewModel: TranscribeViewModel = viewModel()) {
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        text = "Añade nombres propios y palabras que el reconocimiento de voz y la IA local deban conservar con precisión. Se guarda solo en este teléfono.",
+                        text = "Añade nombres propios y términos que el reconocimiento de voz y el asistente local deban conservar con precisión. Se guarda solo en este teléfono.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -152,7 +178,7 @@ fun TranscribeApp(viewModel: TranscribeViewModel = viewModel()) {
                         onValueChange = { glossaryDraft = it.take(500) },
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text("Nombres y términos") },
-                        placeholder = { Text("Ej.: Esther María, OpenAI, NumPy") },
+                        placeholder = { Text("Ej.: Esther María, Rodovaldo, NumPy") },
                         minLines = 3,
                         maxLines = 6,
                     )
@@ -177,19 +203,20 @@ fun TranscribeApp(viewModel: TranscribeViewModel = viewModel()) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TranscribeScreen(
     state: TranscribeUiState,
     onRecordRequested: () -> Unit,
     onStop: () -> Unit,
     onTextChanged: (String) -> Unit,
-    onInstructionChanged: (String) -> Unit,
     onReset: () -> Unit,
     onImprove: () -> Unit,
-    onGenerateDraft: () -> Unit,
     onRestoreOriginal: () -> Unit,
     onModeChange: (WorkspaceMode) -> Unit,
+    onChatInputChanged: (String) -> Unit,
+    onChatMic: () -> Unit,
+    onSendChat: () -> Unit,
+    onClearChat: () -> Unit,
     onGlossaryRequested: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -231,7 +258,8 @@ private fun TranscribeScreen(
                     selected = state.mode,
                     onModeChange = onModeChange,
                     enabled = state.stage != TranscribeStage.Recording &&
-                        state.stage != TranscribeStage.Processing,
+                        state.stage != TranscribeStage.Processing &&
+                        state.chatVoiceState == ChatVoiceState.Idle,
                 )
             }
         },
@@ -244,35 +272,46 @@ private fun TranscribeScreen(
                 .imePadding()
                 .padding(horizontal = 24.dp, vertical = 12.dp),
         ) {
-            AnimatedContent(
-                targetState = state.stage,
-                modifier = Modifier.fillMaxSize(),
-                label = "transcribe-stage",
-            ) { stage ->
-                when (stage) {
-                    TranscribeStage.Idle -> IdleContent(
-                        mode = state.mode,
-                        onRecordRequested = onRecordRequested,
-                    )
-                    TranscribeStage.Recording -> RecordingContent(state, onStop)
-                    TranscribeStage.Processing -> ProcessingContent(state.mode)
-                    TranscribeStage.Result -> {
-                        val onCopy = {
-                            val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
-                                as android.content.ClipboardManager
-                            clipboard.setPrimaryClip(
-                                android.content.ClipData.newPlainText("Texto", state.text),
-                            )
-                        }
-                        val onShare = {
-                            val intent = Intent(Intent.ACTION_SEND).apply {
-                                type = "text/plain"
-                                putExtra(Intent.EXTRA_TEXT, state.text)
+            if (state.mode == WorkspaceMode.Assistant) {
+                AssistantContent(
+                    state = state,
+                    onInputChanged = onChatInputChanged,
+                    onMic = onChatMic,
+                    onSend = onSendChat,
+                    onClear = onClearChat,
+                )
+            } else {
+                AnimatedContent(
+                    targetState = state.stage,
+                    modifier = Modifier.fillMaxSize(),
+                    label = "transcribe-stage",
+                ) { stage ->
+                    when (stage) {
+                        TranscribeStage.Idle -> IdleContent(onRecordRequested)
+                        TranscribeStage.Recording -> RecordingContent(state, onStop)
+                        TranscribeStage.Processing -> ProcessingContent()
+                        TranscribeStage.Result -> {
+                            val onCopy = {
+                                val clipboard = context.getSystemService(
+                                    android.content.Context.CLIPBOARD_SERVICE,
+                                ) as android.content.ClipboardManager
+                                clipboard.setPrimaryClip(
+                                    android.content.ClipData.newPlainText(
+                                        "Transcripción",
+                                        state.text,
+                                    ),
+                                )
                             }
-                            context.startActivity(Intent.createChooser(intent, "Compartir texto"))
-                        }
+                            val onShare = {
+                                val intent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_TEXT, state.text)
+                                }
+                                context.startActivity(
+                                    Intent.createChooser(intent, "Compartir texto"),
+                                )
+                            }
 
-                        if (state.mode == WorkspaceMode.Transcribe) {
                             ResultContent(
                                 state = state,
                                 onTextChanged = onTextChanged,
@@ -282,22 +321,12 @@ private fun TranscribeScreen(
                                 onCopy = onCopy,
                                 onShare = onShare,
                             )
-                        } else {
-                            DraftContent(
-                                state = state,
-                                onInstructionChanged = onInstructionChanged,
-                                onTextChanged = onTextChanged,
-                                onGenerate = onGenerateDraft,
-                                onReset = onReset,
-                                onCopy = onCopy,
-                                onShare = onShare,
-                            )
                         }
+                        TranscribeStage.Error -> ErrorContent(
+                            message = state.errorMessage.orEmpty(),
+                            onReset = onReset,
+                        )
                     }
-                    TranscribeStage.Error -> ErrorContent(
-                        message = state.errorMessage.orEmpty(),
-                        onReset = onReset,
-                    )
                 }
             }
         }
@@ -323,11 +352,11 @@ private fun ModeTabs(
                 Text("Transcribir")
             }
             OutlinedButton(
-                onClick = { onModeChange(WorkspaceMode.Write) },
+                onClick = { onModeChange(WorkspaceMode.Assistant) },
                 modifier = Modifier.weight(1f),
                 enabled = enabled,
             ) {
-                Text("Redactar")
+                Text("Asistente")
             }
         } else {
             OutlinedButton(
@@ -338,43 +367,297 @@ private fun ModeTabs(
                 Text("Transcribir")
             }
             FilledTonalButton(
-                onClick = { onModeChange(WorkspaceMode.Write) },
+                onClick = { onModeChange(WorkspaceMode.Assistant) },
                 modifier = Modifier.weight(1f),
                 enabled = enabled,
             ) {
-                Text("Redactar")
+                Text("Asistente")
             }
         }
     }
 }
 
 @Composable
-private fun IdleContent(
-    mode: WorkspaceMode,
-    onRecordRequested: () -> Unit,
+private fun AssistantContent(
+    state: TranscribeUiState,
+    onInputChanged: (String) -> Unit,
+    onMic: () -> Unit,
+    onSend: () -> Unit,
+    onClear: () -> Unit,
 ) {
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(state.chatMessages.size, state.isGeneratingChat) {
+        val extra = if (state.isGeneratingChat) 1 else 0
+        val target = state.chatMessages.size + extra - 1
+        if (target >= 0) {
+            listState.animateScrollToItem(target)
+        }
+    }
+
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column {
+                Text(
+                    text = "Asistente",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = "Parakeet + Gemma 3 1B · local",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(Modifier.weight(1f))
+            if (state.chatMessages.isNotEmpty()) {
+                TextButton(
+                    onClick = onClear,
+                    enabled = !state.isGeneratingChat &&
+                        state.chatVoiceState == ChatVoiceState.Idle,
+                ) {
+                    Text("Nueva conversación")
+                }
+            }
+        }
+
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = PaddingValues(vertical = 8.dp),
+        ) {
+            if (state.chatMessages.isEmpty()) {
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 48.dp, horizontal = 20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text(
+                            text = "¿Qué quieres hacer?",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = TextAlign.Center,
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        Text(
+                            text = "Escribe una petición o usa el micrófono. La voz aparecerá primero en el cuadro para que puedas revisarla antes de enviar.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                }
+            }
+
+            itemsIndexed(state.chatMessages) { _, message ->
+                ChatBubble(message)
+            }
+
+            if (state.isGeneratingChat) {
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Start,
+                    ) {
+                        Card(
+                            shape = RoundedCornerShape(18.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            ),
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                )
+                                Spacer(Modifier.width(10.dp))
+                                Text("Pensando…")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        state.chatError?.let { message ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+
+        if (state.chatVoiceState == ChatVoiceState.Recording) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    text = "Grabando… toca ■ para detener",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
+                Spacer(Modifier.weight(1f))
+                MiniWaveBars(state.chatVoiceAmplitude)
+            }
+        } else if (state.chatVoiceState == ChatVoiceState.Processing) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp,
+                )
+                Text(
+                    text = "Pasando tu voz a texto…",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else if (state.chatVoiceProcessingMs > 0L) {
+            Text(
+                text = "Último dictado transcrito en %.1f s".format(
+                    state.chatVoiceProcessingMs / 1000f,
+                ),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OutlinedTextField(
+                value = state.chatInput,
+                onValueChange = onInputChanged,
+                modifier = Modifier.weight(1f),
+                placeholder = {
+                    Text(
+                        when (state.chatVoiceState) {
+                            ChatVoiceState.Idle -> "Escribe un mensaje…"
+                            ChatVoiceState.Recording -> "Escuchando…"
+                            ChatVoiceState.Processing -> "Transcribiendo…"
+                        },
+                    )
+                },
+                minLines = 1,
+                maxLines = 4,
+                shape = RoundedCornerShape(22.dp),
+                enabled = state.chatVoiceState != ChatVoiceState.Processing,
+            )
+
+            FilledTonalButton(
+                onClick = onMic,
+                modifier = Modifier.size(54.dp),
+                shape = CircleShape,
+                contentPadding = PaddingValues(0.dp),
+                enabled = state.chatVoiceState != ChatVoiceState.Processing &&
+                    !state.isGeneratingChat,
+            ) {
+                Text(
+                    text = if (state.chatVoiceState == ChatVoiceState.Recording) {
+                        "■"
+                    } else {
+                        "🎙"
+                    },
+                    fontSize = 20.sp,
+                )
+            }
+
+            Button(
+                onClick = onSend,
+                modifier = Modifier.size(54.dp),
+                shape = CircleShape,
+                contentPadding = PaddingValues(0.dp),
+                enabled = state.chatInput.isNotBlank() &&
+                    !state.isGeneratingChat &&
+                    state.chatVoiceState == ChatVoiceState.Idle,
+            ) {
+                Text("➤", fontSize = 20.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChatBubble(message: ChatMessage) {
+    val isUser = message.role == ChatRole.User
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = if (isUser) {
+            Arrangement.End
+        } else {
+            Arrangement.Start
+        },
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth(0.88f),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = if (isUser) {
+                    MaterialTheme.colorScheme.primaryContainer
+                } else {
+                    MaterialTheme.colorScheme.surfaceVariant
+                },
+            ),
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                SelectionContainer {
+                    Text(
+                        text = message.text,
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
+                if (!isUser && message.elapsedMs > 0L) {
+                    Text(
+                        text = "Gemma 3 1B · %.1f s".format(message.elapsedMs / 1000f),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun IdleContent(onRecordRequested: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
-            text = if (mode == WorkspaceMode.Transcribe) {
-                "Habla y conviértelo en texto"
-            } else {
-                "Dime qué quieres redactar"
-            },
+            text = "Habla y conviértelo en texto",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.SemiBold,
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(12.dp))
         Text(
-            text = if (mode == WorkspaceMode.Transcribe) {
-                "El audio se procesa directamente en este teléfono."
-            } else {
-                "Tu orden se transcribe y la IA local redacta el texto sin conexión."
-            },
+            text = "El audio se procesa directamente en este teléfono.",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -390,11 +673,7 @@ private fun IdleContent(
         }
         Spacer(Modifier.height(18.dp))
         Text(
-            text = if (mode == WorkspaceMode.Transcribe) {
-                "Toca para hablar"
-            } else {
-                "Toca para dictar la orden"
-            },
+            text = "Toca para hablar",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Medium,
         )
@@ -409,11 +688,7 @@ private fun RecordingContent(state: TranscribeUiState, onStop: () -> Unit) {
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
-            text = if (state.mode == WorkspaceMode.Transcribe) {
-                "Grabando"
-            } else {
-                "Escuchando tu orden"
-            },
+            text = "Grabando",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.SemiBold,
         )
@@ -436,11 +711,7 @@ private fun RecordingContent(state: TranscribeUiState, onStop: () -> Unit) {
         }
         Spacer(Modifier.height(18.dp))
         Text(
-            text = if (state.mode == WorkspaceMode.Transcribe) {
-                "Detener y transcribir"
-            } else {
-                "Detener y revisar orden"
-            },
+            text = "Detener y transcribir",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Medium,
         )
@@ -493,7 +764,29 @@ private fun WaveBars(amplitude: Float) {
 }
 
 @Composable
-private fun ProcessingContent(mode: WorkspaceMode) {
+private fun MiniWaveBars(amplitude: Float) {
+    val factors = listOf(0.55f, 1f, 0.72f)
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.height(24.dp),
+    ) {
+        factors.forEach { factor ->
+            val target = (6 + 16 * (amplitude * factor).coerceIn(0f, 1f)).dp
+            val height by animateDpAsState(targetValue = target, label = "chat-wave-bar")
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .height(height)
+                    .clip(RoundedCornerShape(99.dp))
+                    .background(MaterialTheme.colorScheme.error),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProcessingContent() {
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -502,21 +795,13 @@ private fun ProcessingContent(mode: WorkspaceMode) {
         CircularProgressIndicator(modifier = Modifier.size(58.dp))
         Spacer(Modifier.height(28.dp))
         Text(
-            text = if (mode == WorkspaceMode.Transcribe) {
-                "Transcribiendo…"
-            } else {
-                "Preparando la orden…"
-            },
+            text = "Transcribiendo…",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.SemiBold,
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            text = if (mode == WorkspaceMode.Transcribe) {
-                "Parakeet está procesando el audio en el teléfono."
-            } else {
-                "Parakeet está convirtiendo tu instrucción en texto para que puedas revisarla."
-            },
+            text = "Parakeet está procesando el audio en el teléfono.",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -650,153 +935,12 @@ private fun ResultContent(
                 Text("Compartir")
             }
         }
+
         Button(
             onClick = onReset,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text("Nueva grabación")
-        }
-    }
-}
-
-@Composable
-private fun DraftContent(
-    state: TranscribeUiState,
-    onInstructionChanged: (String) -> Unit,
-    onTextChanged: (String) -> Unit,
-    onGenerate: () -> Unit,
-    onReset: () -> Unit,
-    onCopy: () -> Unit,
-    onShare: () -> Unit,
-) {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        Text(
-            text = "Redactar",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.SemiBold,
-        )
-
-        Text(
-            text = "Revisa la orden antes de ejecutarla",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        OutlinedTextField(
-            value = state.instruction,
-            onValueChange = onInstructionChanged,
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("Instrucción") },
-            placeholder = {
-                Text("Ej.: Redáctame por puntos las ventajas de trabajar sin conexión…")
-            },
-            minLines = 3,
-            maxLines = 6,
-            shape = RoundedCornerShape(18.dp),
-        )
-
-        AnimatedVisibility(visible = state.processingMs > 0) {
-            Text(
-                text = "Orden transcrita en %.1f s".format(state.processingMs / 1000f),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        Button(
-            onClick = onGenerate,
-            modifier = Modifier.fillMaxWidth(),
-            enabled = state.instruction.isNotBlank() &&
-                state.llmAvailable &&
-                !state.isGeneratingDraft,
-        ) {
-            if (state.isGeneratingDraft) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(18.dp),
-                    strokeWidth = 2.dp,
-                )
-                Spacer(Modifier.width(10.dp))
-                Text("Redactando…")
-            } else {
-                Text("✨ Redactar")
-            }
-        }
-
-        if (!state.llmAvailable) {
-            Text(
-                text = "La redacción con IA local requiere un dispositivo Android de 64 bits.",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        state.draftError?.let { message ->
-            Text(
-                text = message,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
-
-        if (state.text.isNotBlank()) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "Resultado",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Spacer(Modifier.weight(1f))
-                if (state.draftMs > 0) {
-                    Text(
-                        text = "Gemma 3 1B · %.1f s".format(state.draftMs / 1000f),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-
-            OutlinedTextField(
-                value = state.text,
-                onValueChange = onTextChanged,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                textStyle = MaterialTheme.typography.bodyLarge,
-                shape = RoundedCornerShape(20.dp),
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                FilledTonalButton(
-                    onClick = onCopy,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text("Copiar")
-                }
-                OutlinedButton(
-                    onClick = onShare,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text("Compartir")
-                }
-            }
-        } else {
-            Spacer(Modifier.weight(1f))
-        }
-
-        Button(
-            onClick = onReset,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text("Nueva orden")
         }
     }
 }
