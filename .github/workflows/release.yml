@@ -2,6 +2,8 @@ name: Publish signed release
 
 on:
   push:
+    branches:
+      - experiment/whisper-large-v3-turbo-greedy
     tags:
       - "v*"
   workflow_dispatch:
@@ -107,6 +109,8 @@ jobs:
           set -euo pipefail
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             VERSION="${GITHUB_REF_NAME#v}"
+          elif [[ "${GITHUB_REF_NAME}" == "experiment/whisper-large-v3-turbo-greedy" ]]; then
+            VERSION="0.4.0-alpha3b"
           else
             VERSION="manual-${GITHUB_RUN_NUMBER}"
           fi
@@ -125,11 +129,21 @@ jobs:
           if-no-files-found: error
 
       - name: Publish GitHub Release
-        if: github.ref_type == 'tag'
+        if: github.ref_type == 'tag' || github.ref_name == 'experiment/whisper-large-v3-turbo-greedy'
         env:
           GH_TOKEN: ${{ github.token }}
           APK_FILE: ${{ steps.package.outputs.file }}
         shell: bash
         run: |
           set -euo pipefail
-          gh release create "$GITHUB_REF_NAME"             "$APK_FILE"             "$APK_FILE.sha256"             --title "Transcribe Offline $GITHUB_REF_NAME"             --generate-notes
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            gh release create "$GITHUB_REF_NAME" "$APK_FILE" "$APK_FILE.sha256" \
+              --title "Transcribe Offline $GITHUB_REF_NAME" --generate-notes
+          else
+            TAG="v0.4.0-alpha3b"
+            gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
+            gh release create "$TAG" "$APK_FILE" "$APK_FILE.sha256" \
+              --title "Transcribe Offline v0.4.0-alpha3b — Whisper Turbo Greedy" \
+              --notes "Controlled latency test: same Gemma 3 1B and Whisper Large V3 Turbo Q5_0 as alpha3, with beam search replaced by greedy best_of=1." \
+              --prerelease --target "$GITHUB_SHA"
+          fi
