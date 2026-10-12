@@ -2,6 +2,37 @@
 
 All notable changes to **Transcribe Offline Android** are documented here.
 
+## 0.4.0-alpha4 — Parakeet TDT benchmark
+
+Status: **experimental device benchmark**
+
+### Changed
+
+- Keeps **Gemma 3 1B IT QAT Q4_0 unchanged** from alpha2.
+- Replaces Whisper with **Parakeet TDT 0.6B v3 Q4_0** for speech recognition.
+- Adds a dedicated `core-parakeet` JNI module behind the existing `SpeechToTextEngine` contract.
+- Uses the official Parakeet runtime added to `whisper.cpp` v1.9.0.
+- Keeps the existing 16 kHz mono recording pipeline, silence trimming, metrics and conservative vocabulary post-correction.
+
+### Why
+
+Whisper Large V3 Turbo produced good transcription quality but required roughly 46–47 seconds to process only a few seconds of speech on a Pixel 9, which is not viable for the intended lower-end Android target. This alpha evaluates a different ASR architecture rather than making Whisper larger.
+
+### Model
+
+- NVIDIA Parakeet TDT 0.6B v3
+- Q4_0 conversion from `ggml-org/parakeet-GGUF`
+- Size: 355,615,679 bytes (~356 MB)
+- SHA-256: `aa7fe2f5fb47d863ca23e8b1d490632d63a2599f515268b6d6bd656158dad45e`
+
+### Vocabulary behavior
+
+Parakeet automatically detects language and does not expose Whisper-style `initial_prompt` vocabulary biasing. The app therefore keeps the same local vocabulary for conservative post-correction and for Gemma.
+
+### Privacy
+
+No runtime network dependency is introduced. The Android manifest still requests no `INTERNET` permission.
+
 ## 0.4.0-alpha2 — Gemma 3 1B writing benchmark
 
 Status: **experimental device benchmark**
