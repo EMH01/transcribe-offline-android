@@ -2,6 +2,26 @@
 
 All notable changes to **Transcribe Offline Android** are documented here.
 
+## 0.4.0-alpha5 — Offline conversational assistant
+
+Status: **experimental UX benchmark**
+
+### Changed
+
+- Renamed the second workspace from **Redactar** to **Asistente**.
+- Replaced the one-shot instruction/result screen with a familiar local chat interface.
+- Text can be typed directly or dictated with the microphone beside the send button.
+- Voice input is transcribed by Parakeet into the editable message field before anything is sent to Gemma.
+- Conversation history remains visible when switching between **Transcribir** and **Asistente**.
+- Gemma receives only the last 6 conversation messages to keep local context bounded and avoid progressively slower prompts.
+- Added **Nueva conversación** without affecting the transcription workspace.
+
+### Unchanged
+
+- Parakeet TDT 0.6B v3 Q4_0 remains the speech engine.
+- Gemma 3 1B IT QAT Q4_0 remains the local text model.
+- No runtime Internet permission or cloud dependency is introduced.
+
 ## 0.4.0-alpha4 — Parakeet TDT benchmark
 
 Status: **experimental device benchmark**
