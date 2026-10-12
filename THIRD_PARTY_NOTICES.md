@@ -10,9 +10,13 @@ Project: https://github.com/ggml-org/whisper.cpp
 
 License: MIT.
 
-## Whisper Base Q5_1 model
+## Whisper Large V3 Turbo Q5_0 model
 
-The build downloads the `ggml-base-q5_1.bin` model distributed for `whisper.cpp` from the `ggerganov/whisper.cpp` Hugging Face repository and verifies its SHA-256 before packaging it into the APK.
+The alpha3 build downloads `ggml-large-v3-turbo-q5_0.bin` distributed for `whisper.cpp` from the `ggerganov/whisper.cpp` Hugging Face repository and verifies it before packaging.
+
+SHA-256:
+
+`394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2`
 
 
 ## llama.cpp
