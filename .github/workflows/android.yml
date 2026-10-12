@@ -2,7 +2,7 @@ name: Android CI
 
 on:
   push:
-    branches: [ main, experiment/parakeet-tdt-q4 ]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
