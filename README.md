@@ -4,7 +4,7 @@
 
 It is intended for people and environments where reliable access to cloud AI cannot be assumed: intermittent or expensive connectivity, slow networks, older hardware, limited infrastructure, or regions and networks where modern online services are unavailable or restricted.
 
-The app records speech locally and transcribes it with **Whisper Base multilingual Q5_1** through `whisper.cpp`. Once installed, it requires **no account, API key, server, cloud service, or Internet connection** to perform transcription.
+The current alpha records speech locally and transcribes it with **Parakeet TDT 0.6B v3 Q4_0** through the Parakeet runtime in `whisper.cpp`. Once installed, it requires **no account, API key, server, cloud service, or Internet connection** to perform transcription.
 
 ## Why this project exists
 
@@ -26,20 +26,20 @@ The goal is not to reproduce a large cloud AI stack on a low-end phone. It is to
 - **Modular architecture** — the speech stack can later be reused by a fully local LLM assistant.
 - **Reproducible builds** — the model and `whisper.cpp` revision are pinned and verified.
 
-## Current experiment: 0.4.0-alpha2
+## Current experiment: 0.4.0-alpha4
 
-Version **0.4.0-alpha2** keeps the validated Whisper Base Q5_1 transcription pipeline and replaces the first 0.5B writing experiment with **Gemma 3 1B IT QAT Q4_0** through `llama.cpp`.
+Version **0.4.0-alpha4** keeps **Gemma 3 1B IT QAT Q4_0 unchanged** and changes only the speech recognizer from Whisper to **NVIDIA Parakeet TDT 0.6B v3 Q4_0** for a direct on-device ASR comparison.
 
 The app now has two clearly separated modes:
 
 - **Transcribe** — record speech, obtain editable local transcription, and optionally use **✨ Improve writing** to clean punctuation and wording without changing the intended meaning.
-- **Write** — dictate a writing instruction such as “redáctame por puntos…”; Whisper converts the instruction to editable text, then the local LLM generates the requested text.
+- **Write** — dictate a writing instruction such as “redáctame por puntos…”; Parakeet converts the instruction to editable text, then the local LLM generates the requested text.
 
-The existing editable local vocabulary is shared by both Whisper and the local LLM so uncommon names and terms can be preserved across transcription and writing. The Android manifest still contains no `INTERNET` permission: both speech recognition and text generation run on-device after installation.
+The existing editable local vocabulary still feeds the local correction layer and the LLM. Parakeet itself does not expose Whisper-style prompt biasing, so this experiment deliberately measures its raw ASR behavior plus the same conservative post-correction already used by the app. The Android manifest still contains no `INTERNET` permission: both speech recognition and text generation run on-device after installation.
 
-The first 0.4.0 alpha proved that the architecture works fully offline, but Qwen2.5 0.5B was too weak for reliable instruction-driven drafting on the target phone. Alpha2 keeps the same UI and flow so **Gemma 3 1B** can be compared directly. Its Q4_0 GGUF is about **720 MB**, so storage, RAM usage and generation speed must be validated on the same device before this line is considered stable.
+The previous Whisper Large V3 Turbo benchmark produced good text but took roughly 46–47 seconds for only a few seconds of speech on a Pixel 9, making it unsuitable for the intended low-end Android target. Alpha4 therefore tests a different ASR architecture rather than a larger Whisper model.
 
-The trade-off is deliberate: Base is larger and may take longer to process than Tiny. The app therefore continues to expose audio duration, useful-voice duration, processing time and RTF so the accuracy/performance balance can be measured on the actual device.
+Parakeet Q4_0 is about **356 MB**. The goal is to see whether it can materially improve accuracy over Whisper Base while remaining much more practical than Whisper Large V3 Turbo. The app therefore continues to expose audio duration, useful-voice duration, processing time and RTF so the accuracy/performance balance can be measured on the actual device.
 
 ## Stable baseline: 0.2.1
 
@@ -88,10 +88,10 @@ These changes improve both **latency** and **transcription stability** on constr
        ├── :core-speech
        │     └── SpeechToTextEngine contract
        │
-       ├── :core-whisper
-       │     ├── WhisperBaseEngine
+       ├── :core-parakeet
+       │     ├── ParakeetEngine
        │     ├── JNI bridge
-       │     └── whisper.cpp
+       │     └── whisper.cpp Parakeet runtime
        │
        ├── :core-text
        │     └── TextImprovementEngine contract
@@ -102,26 +102,26 @@ These changes improve both **latency** and **transcription stability** on constr
              └── llama.cpp + Gemma 3 1B IT QAT Q4_0
 ```
 
-The UI does not depend directly on Whisper. It talks to the `SpeechToTextEngine` abstraction, which keeps the application replaceable and reusable.
+The UI does not depend directly on a specific ASR. It talks to the `SpeechToTextEngine` abstraction, which keeps the application replaceable and reusable.
 
-That separation is intentional: a future local assistant can reuse `core-audio`, `core-speech` and `core-whisper`, then add a `core-llm` module without rewriting the speech pipeline.
+That separation is intentional: Whisper and Parakeet can be benchmarked behind the same speech contract without rewriting the recording, UI or LLM layers.
 
 ## Offline behavior
 
 The Android manifest intentionally contains **no `INTERNET` permission**.
 
-At build time, the development machine obtains the native inference sources and model weights needed for the selected build. Whisper Base and the Gemma GGUF are SHA-256 verified before packaging.
+At build time, the development machine obtains the native inference sources and model weights needed for the selected build. Parakeet Q4_0 and the Gemma GGUF are SHA-256 verified before packaging.
 
 The final APK contains both model families and native inference code. On the phone, transcription, writing improvement and instruction-driven drafting therefore remain available in airplane mode.
 
 ## Model
 
-- **Model:** `ggml-base-q5_1.bin`
-- **Family:** Whisper Base multilingual
-- **Quantization:** Q5_1
-- **Approximate model size:** 60 MB
-- **Runtime language:** Spanish (`es`)
-- **SHA-256:** `422f1ae452ade6f30a004d7e5c6a43195e4433bc370bf23fac9cc591f01a8898`
+- **Model:** `ggml-parakeet-tdt-0.6b-v3-q4_0.bin`
+- **Family:** NVIDIA Parakeet TDT 0.6B v3
+- **Quantization:** Q4_0
+- **Model size:** 355,615,679 bytes (~356 MB)
+- **Languages:** 25 European languages, including Spanish, with automatic language detection
+- **SHA-256:** `aa7fe2f5fb47d863ca23e8b1d490632d63a2599f515268b6d6bd656158dad45e`
 
 The model binary is not committed to Git. Gradle downloads and verifies it before packaging it under `assets/models/`.
 
@@ -149,10 +149,10 @@ This makes performance work measurable rather than subjective.
 ## Android compatibility
 
 - **Minimum Android:** 8.0 / API 26
-- **Whisper transcription ABIs:** `arm64-v8a`, `armeabi-v7a`
+- **Parakeet transcription ABIs:** `arm64-v8a`, `armeabi-v7a`
 - **Local LLM writing features:** `arm64-v8a` only in the current alpha
 - **Audio input:** 16-bit PCM, mono, 16 kHz
-- Whisper and Gemma inference run on dedicated background threads so the Compose UI remains responsive.
+- Parakeet and Gemma inference run on dedicated background threads so the Compose UI remains responsive.
 
 ## User experience
 
@@ -218,7 +218,7 @@ The objective is not to present AI-generated code as expertise by itself. It is 
 
 Near-term work:
 
-- compare Gemma 3 1B generation quality and latency against the observed Qwen2.5 0.5B alpha1 result;
+- compare Parakeet TDT 0.6B v3 Q4_0 accuracy and RTF against the validated Whisper Base result and the too-slow Whisper Large V3 Turbo result;
 - validate the **Improve writing** prompt against real Spanish dictation;
 - validate voice-driven **Write** instructions and formatting requests;
 - compare smaller quantizations only if device constraints require it;
@@ -230,7 +230,7 @@ Future direction:
 ```text
 Microphone
     ↓
-Whisper
+local ASR
     ↓
 local text
     ↓
@@ -245,6 +245,6 @@ The long-term goal is to reuse the offline speech stack as the input layer for a
 
 ## Third-party software
 
-`whisper.cpp` and `llama.cpp` are developed by Georgi Gerganov and contributors and are used under their MIT licenses. Gemma 3 model weights are provided under the Gemma Terms of Use.
+`whisper.cpp` and `llama.cpp` are developed by Georgi Gerganov and contributors and are used under their MIT licenses. Parakeet TDT 0.6B v3 is based on NVIDIA's model distributed under CC-BY-4.0. Gemma 3 model weights are provided under the Gemma Terms of Use.
 
 See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for details.
