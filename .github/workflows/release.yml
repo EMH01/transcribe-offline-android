@@ -7,8 +7,8 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: signed-release-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: signed-release-publish
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -96,8 +96,51 @@ jobs:
           fi
           echo "Stable signing certificate verified."
 
+      - name: Calculate release version
+        id: calculated
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          BASE_VERSION="$(sed -n 's/.*versionName = providers.gradleProperty("loquiaVersionName").orNull ?: "\([^"]*\)".*/\1/p' app/build.gradle.kts)"
+          BASE_CODE="$(sed -n 's/.*versionCode = providers.gradleProperty("loquiaVersionCode").orNull?.toInt() ?: \([0-9]*\).*/\1/p' app/build.gradle.kts)"
+          test -n "$BASE_VERSION" && test -n "$BASE_CODE"
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+            CODE="$BASE_CODE"
+          else
+            gh release list --limit 1000 --json tagName --jq '.[].tagName' > /tmp/loquia-release-tags
+            VERSION="$(python3 - "$BASE_VERSION" /tmp/loquia-release-tags <<'PY'
+          import re
+          import sys
+          from pathlib import Path
+          base = sys.argv[1]
+          match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)", base)
+          if not match:
+              raise SystemExit("Expected a numeric MAJOR.MINOR.PATCH base version")
+          major, minor, patch = map(int, match.groups())
+          used = set()
+          for line in Path(sys.argv[2]).read_text().splitlines():
+              found = re.fullmatch(r"v?(\d+)\.(\d+)\.(\d+)", line.strip())
+              if found:
+                  a, b, c = map(int, found.groups())
+                  if (a, b) == (major, minor):
+                      used.add(c)
+          while patch in used:
+              patch += 1
+          print(f"{major}.{minor}.{patch}")
+          PY
+            )"
+            # The workflow run number increases monotonically for manual builds.
+            CODE="$((BASE_CODE + GITHUB_RUN_NUMBER))"
+          fi
+          echo "name=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          echo "Building Loquia $VERSION (versionCode $CODE)"
+
       - name: Build signed release APK
-        run: gradle :app:assembleRelease --stacktrace
+        run: gradle :app:assembleRelease -PloquiaVersionName=${{ steps.calculated.outputs.name }} -PloquiaVersionCode=${{ steps.calculated.outputs.code }} --stacktrace
 
       - name: Report APK size breakdown
         shell: bash
@@ -149,6 +192,10 @@ jobs:
           CODE="$(printf '%s\n' "$BADGING" | sed -n "s/^package:.*versionCode='\([^']*\)'.*/\1/p")"
           test -n "$VERSION"
           test -n "$CODE"
+          if [[ "$VERSION" != "${{ steps.calculated.outputs.name }}" || "$CODE" != "${{ steps.calculated.outputs.code }}" ]]; then
+            echo "::error::Packaged version does not match calculated release version."
+            exit 1
+          fi
           if [[ "$GITHUB_REF_TYPE" == "tag" && "${GITHUB_REF_NAME#v}" != "$VERSION" ]]; then
             echo "::error::Release tag does not match packaged version $VERSION"
             exit 1
