@@ -26,9 +26,9 @@ The goal is not to reproduce a large cloud AI stack on a low-end phone. It is to
 - **Modular architecture** — the speech stack can later be reused by a fully local LLM assistant.
 - **Reproducible builds** — the model and `whisper.cpp` revision are pinned and verified.
 
-## Current experiment: 0.4.0-alpha12
+## Current release: 0.4.0
 
-Version **0.4.0-alpha12** combines **Parakeet TDT 0.6B v3 Q4_0** transcription with the compact **LFM2.5 1.2B Instruct Q4_K_M** conversational model for constrained Android devices.
+Version **0.4.0** combines **Parakeet TDT 0.6B v3 Q4_0** transcription with the compact **LFM2.5 1.2B Instruct Q4_K_M** conversational model for constrained Android devices.
 
 The app now has two clearly separated modes:
 
@@ -74,7 +74,7 @@ These changes improve both **latency** and **transcription stability** on constr
 
 ## Install and test builds
 
-The signed Android package keeps application ID `com.emh01.transcribeoffline` so it updates existing installations. The current version is `0.4.0-alpha12` (code `21`). The release workflow verifies the packaged identity and version before publishing the signed prerelease. Only install the APK attached to the matching GitHub Release.
+The signed Android package keeps application ID `com.emh01.transcribeoffline` so it updates existing installations. The current stable version is `0.4.0` (code `22`). The release workflow verifies the packaged identity and version before publishing the signed release. Only install the APK attached to the matching GitHub Release.
 
 Chat requires a 64-bit Android device in the current alpha; 32-bit devices may still support transcription but not local LFM generation. Test on the target device before treating this version as stable. The chat history is stored in local app preferences, not encrypted; do not use it for sensitive content on a shared device.
 

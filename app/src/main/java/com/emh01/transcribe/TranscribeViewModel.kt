@@ -33,7 +33,7 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
     private var glossary: String = if (preferences.contains(KEY_GLOSSARY)) {
         preferences.getString(KEY_GLOSSARY, "").orEmpty()
     } else {
-        DEFAULT_GLOSSARY
+        ""
     }
 
     private val restoredChatConversations = restoreChatConversations()
@@ -715,5 +715,3 @@ private const val MAX_SAVED_CHAT_MESSAGES = 40
 private const val MAX_SAVED_CONVERSATIONS = 50
 private const val MAX_GLOSSARY_CHARS = 500
 private const val MAX_CHAT_INPUT_CHARS = 3_000
-private const val DEFAULT_GLOSSARY =
-    "Esther María, Amarilys, Rodovaldo, Guillermina, Alejandro, Martín, Romel, Daniel"

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0 — First stable Loquia release
+
+- Keep the Loquia header visible while the keyboard is open; chat messages resize above it.
+- Restore the full tagline: “Asistente de voz privado, local y sin conexión”.
+- Rename the transcription glossary to “Vocabulario especial”.
+- Use Loquia-styled microphone and send controls instead of emoji buttons.
+- Start the special vocabulary empty and use neutral, non-personal examples.
+
 ## 0.4.0-alpha12 — LFM conversational benchmark
 
 - Replace the chat model with **LFM2.5 1.2B Instruct Q4_K_M**.
@@ -138,7 +146,7 @@ Status: **experimental device benchmark**
 ### Improved
 
 - Multi-word vocabulary matching now tolerates a larger phonetic miss on the first token when the remaining name tokens match exactly.
-- Specifically covers observed cases such as `ser María` → `Esther María`.
+- Covers close phonetic misses in the first token of a multi-word vocabulary entry.
 - Keeps the safeguard that the distinctive trailing part of the proper name must already match, reducing the risk of unrelated replacements.
 
 ### Performance
@@ -151,7 +159,7 @@ Status: **experimental device benchmark**
 
 ### Improved
 
-- Refined multi-word vocabulary matching so close variants such as `esta María` can resolve to `Esther María` when that name is present in the local vocabulary.
+- Refined multi-word vocabulary matching for close variants of a user-provided entry.
 - Added a narrowly scoped post-correction for the observed dictation error `ditar` → `dictar`.
 - Kept the correction layer conservative: it never inserts missing semantic content such as `mi hija` when Whisper did not transcribe it.
 
@@ -166,7 +174,7 @@ Status: **experimental device benchmark**
 ### Added
 
 - Local post-processing that corrects only near-matches against the user vocabulary.
-- Multi-word proper-name recovery such as `Este María` → `Esther María`.
+- Multi-word proper-name recovery from a user-provided vocabulary entry.
 - Conservative matching thresholds to reduce accidental edits to ordinary words.
 - Canonical casing and accent restoration for vocabulary entries.
 
@@ -183,7 +191,7 @@ Status: **experimental device benchmark**
 - Editable local vocabulary for proper names and difficult terms.
 - On-device persistence through Android SharedPreferences.
 - Whisper `initial_prompt` support through the speech-engine abstraction and JNI bridge.
-- Initial vocabulary: Esther María, Amarilys, Rodovaldo, Guillermina, Alejandro, Martín, Romel and Daniel.
+- The vocabulary starts empty and is populated only with terms chosen by the user.
 
 ### Privacy
 

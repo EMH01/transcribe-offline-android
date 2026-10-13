@@ -8,8 +8,8 @@ import kotlin.math.max
  *
  * Whisper remains responsible for the transcription. This corrector only
  * replaces a word or same-length phrase when it is very close to an entry in
- * the local glossary, so the glossary can restore spellings such as
- * "Este María" -> "Esther María" without acting as a general autocorrect.
+ * the local glossary, so the glossary can restore a user-provided spelling
+ * without acting as a general autocorrect.
  */
 object LocalVocabularyCorrector {
     private val wordRegex = Regex("""\p{L}+(?:['’\-]\p{L}+)*""")
@@ -91,8 +91,8 @@ object LocalVocabularyCorrector {
 
             // If the rest of a multi-word proper name matches exactly, allow a
             // slightly wider phonetic miss on the first token. This covers
-            // observed variants such as "ser María" -> "Esther María" while
-            // still requiring the distinctive trailing name to match exactly.
+            // observed variants while still requiring the distinctive trailing
+            // token to match exactly.
             if (trailingWordsMatch) {
                 val candidateFirst = candidateWords.first()
                 val canonicalFirst = canonicalWords.first()

@@ -17,11 +17,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -60,9 +59,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -176,7 +175,7 @@ fun TranscribeApp(viewModel: TranscribeViewModel = viewModel()) {
     if (showGlossary) {
         AlertDialog(
             onDismissRequest = { showGlossary = false },
-            title = { Text("Vocabulario local") },
+            title = { Text("Vocabulario especial") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
@@ -189,7 +188,7 @@ fun TranscribeApp(viewModel: TranscribeViewModel = viewModel()) {
                         onValueChange = { glossaryDraft = it.take(500) },
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text("Nombres y términos") },
-                        placeholder = { Text("Ej.: Esther María, Rodovaldo, NumPy") },
+                        placeholder = { Text("Ej.: nombre propio, término técnico, sigla") },
                         minLines = 3,
                         maxLines = 6,
                     )
@@ -235,14 +234,12 @@ private fun TranscribeScreen(
     onGlossaryRequested: () -> Unit,
 ) {
     val context = LocalContext.current
-    val keyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
-
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            if (!keyboardVisible || state.mode != WorkspaceMode.Chat) Column(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .statusBarsPadding()
@@ -265,14 +262,14 @@ private fun TranscribeScreen(
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
-                            text = "Privado · local · sin conexión",
+                            text = "Asistente de voz privado, local y sin conexión",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     Spacer(Modifier.weight(1f))
                     TextButton(onClick = onGlossaryRequested) {
-                        Text("Vocabulario")
+                        Text("Vocabulario especial")
                     }
                 }
 
@@ -613,14 +610,14 @@ private fun AssistantContent(
                 enabled = state.chatVoiceState != ChatVoiceState.Processing &&
                     !state.isGeneratingChat,
             ) {
-                Text(
-                    text = if (state.chatVoiceState == ChatVoiceState.Recording) {
-                        "■"
-                    } else {
-                        "🎙"
-                    },
-                    fontSize = 20.sp,
-                )
+                if (state.chatVoiceState == ChatVoiceState.Recording) {
+                    Text(text = "■", fontSize = 20.sp)
+                } else {
+                    ActionIcon(
+                        drawable = R.drawable.ic_action_microphone,
+                        description = "Dictar mensaje",
+                    )
+                }
             }
 
             Button(
@@ -632,7 +629,10 @@ private fun AssistantContent(
                     !state.isGeneratingChat &&
                     state.chatVoiceState == ChatVoiceState.Idle,
             ) {
-                Text("➤", fontSize = 20.sp)
+                ActionIcon(
+                    drawable = R.drawable.ic_action_send,
+                    description = "Enviar mensaje",
+                )
             }
         }
     }
@@ -808,7 +808,10 @@ private fun IdleContent(onRecordRequested: () -> Unit) {
             shape = CircleShape,
             contentPadding = PaddingValues(0.dp),
         ) {
-            Text(text = "🎙", fontSize = 42.sp)
+            ActionIcon(
+                drawable = R.drawable.ic_action_microphone,
+                description = "Iniciar transcripción",
+            )
         }
         Spacer(Modifier.height(18.dp))
         Text(
@@ -817,6 +820,19 @@ private fun IdleContent(onRecordRequested: () -> Unit) {
             fontWeight = FontWeight.Medium,
         )
     }
+}
+
+@Composable
+private fun ActionIcon(
+    @androidx.annotation.DrawableRes drawable: Int,
+    description: String,
+) {
+    Image(
+        painter = painterResource(drawable),
+        contentDescription = description,
+        contentScale = ContentScale.Crop,
+        modifier = Modifier.fillMaxSize(),
+    )
 }
 
 @Composable

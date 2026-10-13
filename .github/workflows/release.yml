@@ -2,7 +2,6 @@ name: Publish signed release
 
 on:
   push:
-    branches: [ feature/offline-chat-assistant ]
     tags:
       - "v*"
   workflow_dispatch:
@@ -122,10 +121,6 @@ jobs:
             echo "::error::Release tag does not match packaged version $VERSION"
             exit 1
           fi
-          if [[ "$GITHUB_REF_NAME" == "feature/offline-chat-assistant" ]]; then
-            test "$VERSION" = "0.4.0-alpha12"
-            test "$CODE" = "21"
-          fi
           echo "name=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Verified APK version $VERSION (code $CODE)"
 
@@ -134,11 +129,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            VERSION="${GITHUB_REF_NAME#v}"
-          else
-            VERSION="${{ steps.version.outputs.name }}-${GITHUB_SHA:0:7}"
-          fi
+          VERSION="${GITHUB_REF_NAME#v}"
           OUTPUT="Loquia-${VERSION}-official.apk"
           cp app/build/outputs/apk/release/app-release.apk "$OUTPUT"
           echo "file=$OUTPUT" >> "$GITHUB_OUTPUT"
@@ -154,20 +145,14 @@ jobs:
           if-no-files-found: error
 
       - name: Publish GitHub Release
-        if: github.ref_type == 'tag' || github.ref_name == 'feature/offline-chat-assistant'
+        if: github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ github.token }}
           APK_FILE: ${{ steps.package.outputs.file }}
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
-            TAG="$GITHUB_REF_NAME"
-            OPTIONS=()
-          else
-            TAG="chat-${{ steps.version.outputs.name }}-${GITHUB_SHA:0:7}"
-            OPTIONS=(--prerelease)
-          fi
+          TAG="$GITHUB_REF_NAME"
           gh release create "$TAG" "$APK_FILE" "$APK_FILE.sha256" \
             --target "$GITHUB_SHA" --title "Loquia ${{ steps.version.outputs.name }}" \
-            --generate-notes "${OPTIONS[@]}"
+            --generate-notes
