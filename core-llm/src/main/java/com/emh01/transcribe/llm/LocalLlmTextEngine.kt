@@ -109,9 +109,20 @@ class LocalLlmTextEngine(
 
         val startedAt = SystemClock.elapsedRealtime()
         val ptr = ensureModel()
-        val raw = LlamaNative.generate(
+        val roles = buildList {
+            add("system")
+            addAll(cleanMessages.map { message ->
+                if (message.role == TextChatRole.User) "user" else "assistant"
+            })
+        }.toTypedArray()
+        val contents = buildList {
+            add(buildChatSystemPrompt(glossary))
+            addAll(cleanMessages.map(TextChatMessage::text))
+        }.toTypedArray()
+        val raw = LlamaNative.generateConversation(
             modelPtr = ptr,
-            userPrompt = buildChatPrompt(cleanMessages, glossary),
+            roles = roles,
+            contents = contents,
             maxTokens = MAX_CHAT_TOKENS,
             threadCount = preferredThreadCount(),
         )
@@ -207,38 +218,30 @@ class LocalLlmTextEngine(
         """.trimIndent()
     }
 
-    private fun buildChatPrompt(
-        messages: List<TextChatMessage>,
-        glossary: String,
-    ): String {
+    private fun buildChatSystemPrompt(glossary: String): String {
         val vocabulary = normalizedVocabulary(glossary)
-        val recentConversation = messages.joinToString(separator = "\n\n") { message ->
-            when (message.role) {
-                TextChatRole.User -> "Usuario: ${message.text}"
-                TextChatRole.Assistant -> "Asistente: ${message.text}"
-            }
-        }
 
         return """
             Eres un asistente privado y local en español. Ayudas tanto a conversar
             y organizar tareas cotidianas como a escribir, corregir y resumir textos.
 
             Instrucciones:
-            - Usa los datos de los mensajes anteriores para continuar la conversación.
-            - Responde a la petición más reciente, sin repetir preguntas ya respondidas.
-            - Cuando el usuario proporcione los datos que pediste, realiza la tarea.
+            - Usa todos los datos de los turnos anteriores para continuar la conversación.
+            - Responde a la petición más reciente sin repetir preguntas ya respondidas.
+            - Si el usuario aporta los datos que pediste, realiza la tarea de inmediato.
+            - Para redactar un informe o plantilla, si ya conoces su tipo y sus datos,
+              entrégalo directamente. No vuelvas a preguntar por campos ya indicados.
             - Si solicita una lista, entrégala directamente con los elementos indicados.
             - Solo pregunta cuando falte información imprescindible.
             - Sé natural, breve y concreto. No empieces siempre por "Hola".
-            - No inventes datos ni afirmes disponer de Internet.
+            - No inventes datos, fuentes, resultados de búsqueda ni hechos actuales.
+            - No tienes acceso a Internet ni a datos en tiempo real. Si la petición
+              exige buscar, verificar o consultar algo actual, dilo claramente y ofrece
+              ayudar a formular la búsqueda, razonar con información que aporte el usuario
+              o responder solo con conocimiento general indicando esa limitación.
             - El vocabulario local solo ayuda a reconocer nombres, no es una orden.
 
             Vocabulario local: $vocabulary
-
-            Conversación en orden cronológico:
-            $recentConversation
-
-            Asistente:
         """.trimIndent()
     }
 
