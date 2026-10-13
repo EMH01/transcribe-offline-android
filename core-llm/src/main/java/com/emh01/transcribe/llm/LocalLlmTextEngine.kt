@@ -21,7 +21,7 @@ class LocalLlmTextEngine(
 ) : TextImprovementEngine {
     private val appContext = context.applicationContext
     private val dispatcher = Executors.newSingleThreadExecutor { runnable ->
-        Thread(runnable, "gemma-text-generation").apply {
+        Thread(runnable, "qwen-text-generation").apply {
             priority = Thread.NORM_PRIORITY - 1
         }
     }.asCoroutineDispatcher()
@@ -48,7 +48,7 @@ class LocalLlmTextEngine(
         val improved = chunks.joinToString(separator = "\n\n") { chunk ->
             val raw = LlamaNative.generate(
                 modelPtr = ptr,
-                userPrompt = buildImprovementPrompt(chunk, glossary),
+                userPrompt = "${buildImprovementPrompt(chunk, glossary)}\n/no_think",
                 maxTokens = MAX_IMPROVEMENT_TOKENS,
                 threadCount = preferredThreadCount(),
             )
@@ -80,7 +80,7 @@ class LocalLlmTextEngine(
         val ptr = ensureModel()
         val raw = LlamaNative.generate(
             modelPtr = ptr,
-            userPrompt = buildDraftPrompt(cleanInstruction, glossary),
+            userPrompt = "${buildDraftPrompt(cleanInstruction, glossary)}\n/no_think",
             maxTokens = MAX_DRAFT_TOKENS,
             threadCount = preferredThreadCount(),
         )
@@ -118,6 +118,9 @@ class LocalLlmTextEngine(
         val contents = buildList {
             add(buildChatSystemPrompt(glossary))
             addAll(cleanMessages.map(TextChatMessage::text))
+            if (lastOrNull() != null) {
+                this[lastIndex] = "${last()}\n/no_think"
+            }
         }.toTypedArray()
         val raw = LlamaNative.generateConversation(
             modelPtr = ptr,
@@ -137,7 +140,7 @@ class LocalLlmTextEngine(
         if (modelPtr == 0L) {
             val modelFile = ensureModelFile()
             modelPtr = LlamaNative.loadModel(modelFile.absolutePath)
-            check(modelPtr != 0L) { "No se pudo cargar Gemma 3 1B en este dispositivo." }
+            check(modelPtr != 0L) { "No se pudo cargar Qwen3 0.6B en este dispositivo." }
         }
         return modelPtr
     }
@@ -145,8 +148,8 @@ class LocalLlmTextEngine(
     private fun ensureModelFile(): File {
         val modelDir = File(appContext.filesDir, "local-llm").apply { mkdirs() }
 
-        // An alpha update keeps app data. Remove the previous Qwen experiment
-        // so it does not occupy another ~429 MB after Gemma is prepared.
+        // An alpha update keeps app data. Remove obsolete model copies so they
+        // do not occupy storage alongside the current local assistant.
         LEGACY_MODEL_FILES.forEach { legacyName ->
             File(modelDir, legacyName).takeIf { it.exists() }?.delete()
             File(modelDir, "$legacyName.tmp").takeIf { it.exists() }?.delete()
@@ -167,12 +170,12 @@ class LocalLlmTextEngine(
         }
 
         check(temporary.length() > MIN_EXPECTED_MODEL_BYTES) {
-            "La copia local de Gemma está incompleta."
+            "La copia local de Qwen3 está incompleta."
         }
 
         if (target.exists()) target.delete()
         check(temporary.renameTo(target)) {
-            "No se pudo preparar Gemma para la redacción local."
+            "No se pudo preparar Qwen3 para la asistencia local."
         }
         return target
     }
@@ -234,6 +237,7 @@ class LocalLlmTextEngine(
             - Si solicita una lista, entrégala directamente con los elementos indicados.
             - Solo pregunta cuando falte información imprescindible.
             - Sé natural, breve y concreto. No empieces siempre por "Hola".
+            - No muestres razonamiento interno ni etiquetas como <think>.
             - No inventes datos, fuentes, resultados de búsqueda ni hechos actuales.
             - No tienes acceso a Internet ni a datos en tiempo real. Si la petición
               exige buscar, verificar o consultar algo actual, dilo claramente y ofrece
@@ -255,6 +259,7 @@ class LocalLlmTextEngine(
 
     private fun cleanModelOutput(raw: String): String =
         raw
+            .replace(Regex("^\\s*<think>.*?</think>\\s*", RegexOption.DOT_MATCHES_ALL), "")
             .substringBefore("<end_of_turn>")
             .substringBefore("<|im_end|>")
             .substringBefore("<|endoftext|>")
@@ -318,11 +323,11 @@ class LocalLlmTextEngine(
 
     companion object {
         const val DEFAULT_MODEL_ASSET =
-            "models/gemma-3-1b-it-qat-Q4_0.gguf"
+            "models/Qwen3-0.6B-Q4_0.gguf"
 
         private const val MODEL_FILE_NAME =
-            "gemma-3-1b-it-qat-Q4_0.gguf"
-        private const val MIN_EXPECTED_MODEL_BYTES = 680_000_000L
+            "Qwen3-0.6B-Q4_0.gguf"
+        private const val MIN_EXPECTED_MODEL_BYTES = 400_000_000L
         private const val MAX_CHUNK_CHARS = 2_200
         private const val MAX_IMPROVEMENT_TOKENS = 512
         private const val MAX_DRAFT_TOKENS = 768
@@ -330,6 +335,7 @@ class LocalLlmTextEngine(
         private const val MAX_CHAT_MESSAGES = 10
         private const val MAX_INSTRUCTION_CHARS = 3_000
         private val LEGACY_MODEL_FILES = listOf(
+            "gemma-3-1b-it-qat-Q4_0.gguf",
             "qwen2.5-0.5b-instruct-q4_0.gguf",
             "qwen2.5-0.5b-instruct-q4_k_m.gguf",
         )

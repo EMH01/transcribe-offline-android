@@ -445,7 +445,7 @@ private fun AssistantContent(
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    text = "Parakeet + Gemma 3 1B · local",
+                    text = "Parakeet + Qwen3 0.6B · local",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -764,7 +764,7 @@ private fun ChatBubble(message: ChatMessage) {
                 }
                 if (!isUser && message.elapsedMs > 0L) {
                     Text(
-                        text = "Gemma 3 1B · %.1f s".format(message.elapsedMs / 1000f),
+                        text = "Qwen3 0.6B · %.1f s".format(message.elapsedMs / 1000f),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1035,7 +1035,7 @@ private fun ResultContent(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "Gemma 3 1B · %.1f s".format(state.improvementMs / 1000f),
+                    text = "Qwen3 0.6B · %.1f s".format(state.improvementMs / 1000f),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
