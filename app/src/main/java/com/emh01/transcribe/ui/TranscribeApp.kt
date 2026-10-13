@@ -68,6 +68,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.emh01.transcribe.ChatMessage
+import com.emh01.transcribe.ChatConversation
 import com.emh01.transcribe.ChatRole
 import com.emh01.transcribe.ChatVoiceState
 import com.emh01.transcribe.TranscribeStage
@@ -157,7 +158,11 @@ fun TranscribeApp(viewModel: TranscribeViewModel = viewModel()) {
             }
         },
         onSendChat = viewModel::sendChatMessage,
-        onClearChat = viewModel::clearChat,
+        onNewChat = viewModel::startNewConversation,
+        onShowChatHistory = viewModel::showChatHistory,
+        onHideChatHistory = viewModel::hideChatHistory,
+        onOpenConversation = viewModel::openConversation,
+        onDeleteConversation = viewModel::deleteConversation,
         onGlossaryRequested = {
             glossaryDraft = state.glossary
             showGlossary = true
@@ -218,7 +223,11 @@ private fun TranscribeScreen(
     onChatInputChanged: (String) -> Unit,
     onChatMic: () -> Unit,
     onSendChat: () -> Unit,
-    onClearChat: () -> Unit,
+    onNewChat: () -> Unit,
+    onShowChatHistory: () -> Unit,
+    onHideChatHistory: () -> Unit,
+    onOpenConversation: (String) -> Unit,
+    onDeleteConversation: (String) -> Unit,
     onGlossaryRequested: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -285,7 +294,11 @@ private fun TranscribeScreen(
                     onInputChanged = onChatInputChanged,
                     onMic = onChatMic,
                     onSend = onSendChat,
-                    onClear = onClearChat,
+                    onNewChat = onNewChat,
+                    onShowHistory = onShowChatHistory,
+                    onHideHistory = onHideChatHistory,
+                    onOpenConversation = onOpenConversation,
+                    onDeleteConversation = onDeleteConversation,
                 )
             } else {
                 AnimatedContent(
@@ -390,8 +403,23 @@ private fun AssistantContent(
     onInputChanged: (String) -> Unit,
     onMic: () -> Unit,
     onSend: () -> Unit,
-    onClear: () -> Unit,
+    onNewChat: () -> Unit,
+    onShowHistory: () -> Unit,
+    onHideHistory: () -> Unit,
+    onOpenConversation: (String) -> Unit,
+    onDeleteConversation: (String) -> Unit,
 ) {
+    if (state.isChatHistoryVisible) {
+        ChatHistoryContent(
+            conversations = state.chatConversations,
+            onBack = onHideHistory,
+            onNewChat = onNewChat,
+            onOpenConversation = onOpenConversation,
+            onDeleteConversation = onDeleteConversation,
+        )
+        return
+    }
+
     val listState = rememberLazyListState()
 
     LaunchedEffect(state.chatMessages.size, state.isGeneratingChat) {
@@ -412,7 +440,7 @@ private fun AssistantContent(
         ) {
             Column {
                 Text(
-                    text = "Chat",
+                    text = "Asistente",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -423,15 +451,14 @@ private fun AssistantContent(
                 )
             }
             Spacer(Modifier.weight(1f))
-            if (state.chatMessages.isNotEmpty()) {
-                TextButton(
-                    onClick = onClear,
-                    enabled = !state.isGeneratingChat &&
-                        state.chatVoiceState == ChatVoiceState.Idle,
-                ) {
-                    Text("Nueva conversación")
-                }
-            }
+            TextButton(
+                onClick = onShowHistory,
+                enabled = !state.isGeneratingChat && state.chatVoiceState == ChatVoiceState.Idle,
+            ) { Text("Chats") }
+            TextButton(
+                onClick = onNewChat,
+                enabled = !state.isGeneratingChat && state.chatVoiceState == ChatVoiceState.Idle,
+            ) { Text("Nuevo") }
         }
 
         LazyColumn(
@@ -601,6 +628,104 @@ private fun AssistantContent(
                 Text("➤", fontSize = 20.sp)
             }
         }
+    }
+}
+
+@Composable
+private fun ChatHistoryContent(
+    conversations: List<ChatConversation>,
+    onBack: () -> Unit,
+    onNewChat: () -> Unit,
+    onOpenConversation: (String) -> Unit,
+    onDeleteConversation: (String) -> Unit,
+) {
+    var pendingDeletion by remember { mutableStateOf<ChatConversation?>(null) }
+
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TextButton(onClick = onBack) { Text("‹ Volver") }
+            Text(
+                text = "Chats",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = onNewChat) { Text("+ Nuevo") }
+        }
+        Text(
+            text = "Guardados solo en este teléfono",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (conversations.isEmpty()) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text("Aún no tienes conversaciones guardadas.")
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                itemsIndexed(conversations) { _, conversation ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { onOpenConversation(conversation.id) },
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        ),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = conversation.title,
+                                    maxLines = 2,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Medium,
+                                )
+                                Text(
+                                    text = "${conversation.messages.size} mensajes · local",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            TextButton(onClick = { pendingDeletion = conversation }) {
+                                Text("Eliminar")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    pendingDeletion?.let { conversation ->
+        AlertDialog(
+            onDismissRequest = { pendingDeletion = null },
+            title = { Text("Eliminar conversación") },
+            text = { Text("Se borrará definitivamente de este teléfono y no podrá recuperarse.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDeleteConversation(conversation.id)
+                    pendingDeletion = null
+                }) { Text("Eliminar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeletion = null }) { Text("Cancelar") }
+            },
+        )
     }
 }
 
