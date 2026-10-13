@@ -1,266 +1,64 @@
 # Loquia
 
-**Loquia** is a private, local and offline voice assistant that listens, transcribes and converses **entirely on-device**. Its name comes from *loqui* ("to speak").
+**Private, offline voice transcription and chat for Android.**
 
-It is intended for people and environments where reliable access to cloud AI cannot be assumed: intermittent or expensive connectivity, slow networks, older hardware, limited infrastructure, or regions and networks where modern online services are unavailable or restricted.
+The name **Loquia** comes from the **Latin word *loqui***, meaning **“to speak”**. It reflects the project's purpose: making spoken words useful without relying on the cloud.
 
-Loquia records speech locally with **Parakeet TDT 0.6B v3 Q4_0** and provides local conversation with **LFM2.5 1.2B Instruct Q4_K_M**. Once installed, it requires **no account, API key, server, cloud service, or Internet connection** for transcription or chat.
+Loquia transcribes speech and runs a compact conversational assistant **entirely on your device**. No account, API key, server, or internet connection is required to use it after installation. It is designed for everyday use, especially where connectivity is limited, unreliable, expensive, or unavailable.
 
-## Why this project exists
+## Features
 
-Speech-to-text has become a common capability in modern AI products, but many implementations assume fast, continuous and unrestricted Internet access. That assumption excludes users for whom connectivity is unreliable, costly, slow, or simply unavailable.
+- **Transcribe:** record speech, review and edit the text, then copy or share it.
+- **Improve writing:** optionally refine punctuation and wording while preserving the intended meaning.
+- **Chat:** type a message or dictate it using the microphone. Dictated text remains editable and is only sent to the local assistant when you press **Send**.
+- **Local conversations:** reopen or delete chats stored on the device.
+- **Custom vocabulary:** optionally add terms for transcription correction; the list starts empty and is not used as chat context.
+- **Clear performance feedback:** view audio and processing times, including real-time factor (RTF).
+- **Light and dark themes.**
 
-This project explores a different baseline:
+Loquia does not request Android's `INTERNET` permission. Audio transcription, writing improvement and chat are processed locally. Chat history is stored in app preferences **without encryption**; avoid storing sensitive conversations on a shared or unsecured device.
 
-> useful voice transcription should remain available even when the network is not.
+## Download
 
-The goal is not to reproduce a large cloud AI stack on a low-end phone. It is to provide a focused, understandable and practical tool that works locally, respects device constraints, and remains usable in offline-first scenarios.
+Get the signed APK from [GitHub Releases](https://github.com/EMH01/transcribe-offline-android/releases). Choose the APK attached to the release you want to install.
 
-## Design principles
+**Current version:** 0.4.0
 
-- **Offline by default** — runtime transcription never leaves the device.
-- **Low dependency footprint** — no login, backend, analytics service or runtime API.
-- **Lightweight UX** — one primary flow: **record → stop → read/edit → copy/share**.
-- **Older-device aware** — ARM64 and ARMv7 builds, conservative UI, small quantized model.
-- **Transparent performance** — the app shows audio duration, processing time and real-time factor (RTF).
-- **Modular architecture** — the speech stack can later be reused by a fully local LLM assistant.
-- **Reproducible builds** — the model and `whisper.cpp` revision are pinned and verified.
+**Requirements:** Android 8.0 (API 26) or later. Local chat and writing assistance require a **64-bit ARM** device; supported 32-bit ARM devices can use transcription without the local LLM. Performance depends on available memory and processor speed.
 
-## Current release: 0.4.0
+## How it works
 
-Version **0.4.0** combines **Parakeet TDT 0.6B v3 Q4_0** transcription with the compact **LFM2.5 1.2B Instruct Q4_K_M** conversational model for constrained Android devices.
+Loquia uses two quantized models packaged into the Android build:
 
-The app now has two clearly separated modes:
+| Task | On-device model |
+| --- | --- |
+| Speech recognition | Parakeet TDT 0.6B v3 (Q4_0) |
+| Chat and writing improvement | LFM2.5 1.2B Instruct (Q4_K_M) |
 
-- **Transcribe** — record speech, obtain editable local transcription, and optionally use **✨ Improve writing** to clean punctuation and wording without changing the intended meaning.
-- **Chat** — type normally or tap the microphone to dictate a message. Parakeet puts the recognized text into the editable composer first; nothing is processed by LFM until the user presses send. Conversations are stored locally, can be reopened or permanently deleted, and a bounded context window keeps inference practical on the target phone.
+The application is built with **Kotlin and Jetpack Compose**, with native inference through JNI. Separate audio, speech, transcription and text-generation modules keep the implementation maintainable.
 
-The editable vocabulary feeds only the local transcription correction layer. It is deliberately excluded from conversational prompts so names are not mistaken for facts. The Android manifest contains no `INTERNET` permission: both speech recognition and text generation run on-device after installation.
+Model weights and native dependencies are fetched and verified during the build; **end users do not need to download models separately**. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for licensing and attribution.
 
-The previous Whisper Large V3 Turbo benchmark produced good text but took roughly 46–47 seconds for only a few seconds of speech on a Pixel 9, making it unsuitable for the intended low-end Android target. Alpha4 therefore tests a different ASR architecture rather than a larger Whisper model.
+## Build from source
 
-Parakeet Q4_0 is about **356 MB**. The goal is to see whether it can materially improve accuracy over Whisper Base while remaining much more practical than Whisper Large V3 Turbo. The app therefore continues to expose audio duration, useful-voice duration, processing time and RTF so the accuracy/performance balance can be measured on the actual device.
-
-## Stable baseline: 0.2.1
-
-The application has a working end-to-end offline pipeline that has been validated on real Android hardware:
-
-```text
-Microphone
-    ↓
-16 kHz mono PCM
-    ↓
-lightweight voice/silence trimming
-    ↓
-Whisper Tiny Q5_1
-    ↓
-editable transcription
-    ↓
-copy / share
-```
-
-Version **0.2.1** established the first performance and reliability baseline:
-
-- lightweight energy-based voice activity trimming before inference;
-- leading and trailing silence removal to avoid wasting CPU time;
-- deterministic Whisper decoding (`temperature = 0`);
-- blank and non-speech token suppression;
-- stricter no-speech handling to reduce hallucinations on silence;
-- visible audio duration, inference time and RTF;
-- custom adaptive launcher icon;
-- release-signing support for stable Android app identity.
-
-These changes improve both **latency** and **transcription stability** on constrained phones. Version 0.2.1 has been validated as a functional release baseline on real hardware; inference speed still depends heavily on the device CPU, so the app exposes its own performance metrics instead of relying on desktop benchmarks.
-
-## Install and test builds
-
-The signed Android package keeps application ID `com.emh01.transcribeoffline` so it updates existing installations. The current stable version is `0.4.0` (code `22`). The release workflow verifies the packaged identity and version before publishing the signed release. Only install the APK attached to the matching GitHub Release.
-
-Chat requires a 64-bit Android device; 32-bit devices may still support transcription but not local LFM generation. The chat history is stored in local app preferences, not encrypted; do not use it for sensitive content on a shared device.
-
-## Architecture
-
-```text
-:app
-  ├── Jetpack Compose / Material 3 UI
-  ├── TranscribeViewModel
-  └── packaged Whisper model
-       │
-       ├── :core-audio
-       │     ├── AudioRecord
-       │     ├── PCM 16 kHz mono
-       │     └── lightweight voice activity trimming
-       │
-       ├── :core-speech
-       │     └── SpeechToTextEngine contract
-       │
-       ├── :core-parakeet
-       │     ├── ParakeetEngine
-       │     ├── JNI bridge
-       │     └── whisper.cpp Parakeet runtime
-       │
-       ├── :core-text
-       │     └── TextImprovementEngine contract
-       │
-       └── :core-llm
-             ├── LocalLlmTextEngine
-             ├── JNI bridge
-             └── llama.cpp + LFM2.5 1.2B Instruct Q4_K_M
-```
-
-The UI does not depend directly on a specific ASR. It talks to the `SpeechToTextEngine` abstraction, which keeps the application replaceable and reusable.
-
-That separation is intentional: Whisper and Parakeet can be benchmarked behind the same speech contract without rewriting the recording, UI or LLM layers.
-
-## Offline behavior
-
-The Android manifest intentionally contains **no `INTERNET` permission**.
-
-At build time, the development machine obtains the native inference sources and model weights needed for the selected build. Parakeet Q4_0 and the LFM GGUF are SHA-256 verified before packaging.
-
-The final APK contains both model families and native inference code. On the phone, transcription, writing improvement and multi-turn chat therefore remain available in airplane mode.
-
-## Model
-
-- **Model:** `ggml-parakeet-tdt-0.6b-v3-q4_0.bin`
-- **Family:** NVIDIA Parakeet TDT 0.6B v3
-- **Quantization:** Q4_0
-- **Model size:** 355,615,679 bytes (~356 MB)
-- **Languages:** 25 European languages, including Spanish, with automatic language detection
-- **SHA-256:** `aa7fe2f5fb47d863ca23e8b1d490632d63a2599f515268b6d6bd656158dad45e`
-
-The model binary is not committed to Git. Gradle downloads and verifies it before packaging it under `assets/models/`.
-
-## Performance measurement
-
-On-device inference speed varies substantially across CPUs. Instead of hiding that, the app exposes:
-
-- recorded audio duration;
-- voice duration after silence trimming;
-- inference time;
-- **RTF (real-time factor)**.
-
-```text
-RTF = inference time / processed audio duration
-```
-
-Examples:
-
-- `RTF < 1.0` → faster than real time;
-- `RTF = 1.0` → one second of compute per second of audio;
-- `RTF > 1.0` → slower than real time.
-
-This makes performance work measurable rather than subjective.
-
-## Android compatibility
-
-- **Minimum Android:** 8.0 / API 26
-- **Parakeet transcription ABIs:** `arm64-v8a`, `armeabi-v7a`
-- **Local LLM writing features:** `arm64-v8a` only
-- **Audio input:** 16-bit PCM, mono, 16 kHz
-- Parakeet and LFM inference run on dedicated background threads so the Compose UI remains responsive.
-
-## User experience
-
-The interface is intentionally small and direct:
-
-- two clear workspaces: **Transcribe** and **Chat**;
-- large primary recording action;
-- clear recording state and timer;
-- lightweight audio-level visualization;
-- explicit processing state;
-- editable transcription plus a familiar chat composer with optional voice dictation;
-- optional **Improve writing** action after transcription;
-- editable generated result;
-- copy and share actions;
-- light and dark Material 3 themes;
-- adaptive Android launcher icon.
-
-The goal is that a first-time user should be able to operate the app without instructions.
-
-## Build
-
-Requirements:
-
-- Android Studio / JDK 17+
-- Android SDK 35
-- Android NDK
-- CMake 3.22.1
-- Git available during the first native build
-
-Debug build:
+You will need **JDK 17+, Android SDK 35, Android NDK, CMake 3.22.1**, and Git for the native dependencies.
 
 ```bash
 ./gradlew :app:assembleDebug
 ```
 
-Release build:
+For a release build:
 
 ```bash
 ./gradlew :app:assembleRelease
 ```
 
-For real-device distribution, use a **stable signed release APK**, not the debug build. Release signing is configured locally so the private signing key never needs to be committed to the public repository.
+Distributable updates require the project's stable signing key; do not commit signing credentials. See [RELEASE_SIGNING.md](RELEASE_SIGNING.md).
 
-The stable application identity uses a long-lived RSA signing certificate. Its SHA-256 certificate fingerprint is:
+## Contributing and license
 
-```text
-F8:45:DB:90:80:06:0A:59:9D:80:00:99:34:52:93:D7:4C:7E:C4:24:51:49:E5:18:C8:43:0E:0D:AC:B4:B6:E0
-```
+Loquia is open source under the [Apache License 2.0](LICENSE). Contributions and forks are welcome; retain the required copyright, license and attribution notices. See [CONTRIBUTING.md](CONTRIBUTING.md) and [NOTICE](NOTICE).
 
-Future stable APKs must be signed with the same private key so Android can install them as updates over the existing app.
+The **Loquia name and visual identity** are not licensed for use that suggests an unofficial fork is endorsed by or affiliated with the original project. See [TRADEMARKS.md](TRADEMARKS.md).
 
-See [RELEASE_SIGNING.md](RELEASE_SIGNING.md).
-
-## License, attribution and the Loquia name
-
-The source code is licensed under [Apache-2.0](LICENSE). Contributions and
-forks are welcome, provided that applicable copyright, licence and attribution
-notices are preserved. See [NOTICE](NOTICE) and
-[CONTRIBUTING.md](CONTRIBUTING.md).
-
-The Loquia name and visual identity are not granted for use that implies an
-official, endorsed or affiliated release. See [TRADEMARKS.md](TRADEMARKS.md).
-
-## Project background
-
-This project is also an experiment in **AI-assisted engineering across domain boundaries**.
-
-Its author works primarily in **Python and Data Science rather than native Android development**. The project deliberately uses modern AI-assisted development to extend into an unfamiliar stack—Kotlin, Jetpack Compose, JNI, NDK and C++—while keeping the engineering process grounded in reproducible builds, device testing, explicit benchmarks and inspectable architecture.
-
-The objective is not to present AI-generated code as expertise by itself. It is to explore how strong problem decomposition, validation and existing software/data skills can make new technical domains practically accessible.
-
-## Roadmap
-
-Near-term work:
-
-- compare Parakeet TDT 0.6B v3 Q4_0 accuracy and RTF against the validated Whisper Base result and the too-slow Whisper Large V3 Turbo result;
-- validate the **Improve writing** prompt against real Spanish dictation;
-- validate multi-turn **Chat** conversations, voice-dictated messages and bounded context on real hardware;
-- compare smaller quantizations only if device constraints require it;
-- improve long-recording behavior;
-- add local transcription history.
-
-Future direction:
-
-```text
-Microphone
-    ↓
-local ASR
-    ↓
-local text
-    ↓
-small local LLM
-    ↓
-assistant response
-    ↓
-optional local TTS
-```
-
-The long-term goal is to reuse the offline speech stack as the input layer for a small, fully local AI assistant.
-
-## Third-party software
-
-`whisper.cpp` and `llama.cpp` are developed by Georgi Gerganov and contributors and are used under their MIT licenses. Parakeet TDT 0.6B v3 is based on NVIDIA's model distributed under CC-BY-4.0. LFM2.5 model weights are distributed under the LFM Open License v1.0.
-
-See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for details.
+Built by [EMH01](https://github.com/EMH01). For previous releases and technical changes, see [CHANGELOG.md](CHANGELOG.md).
