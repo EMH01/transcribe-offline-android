@@ -119,8 +119,8 @@ jobs:
             exit 1
           fi
           if [[ "$GITHUB_REF_NAME" == "feature/offline-chat-assistant" ]]; then
-            test "$VERSION" = "0.4.0-alpha7"
-            test "$CODE" = "16"
+            test "$VERSION" = "0.4.0-alpha9"
+            test "$CODE" = "18"
           fi
           echo "name=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Verified APK version $VERSION (code $CODE)"
