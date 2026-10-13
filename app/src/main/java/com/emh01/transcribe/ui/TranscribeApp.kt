@@ -20,6 +20,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imeNestedScroll
+import androidx.compose.foundation.layout.exclude
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -59,6 +65,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -225,11 +232,13 @@ private fun TranscribeScreen(
         context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "desconocida"
     }
 
+    val keyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            Column(
+            if (!keyboardVisible || state.mode != WorkspaceMode.Chat) Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .statusBarsPadding()
@@ -273,7 +282,6 @@ private fun TranscribeScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .navigationBarsPadding()
-                .imePadding()
                 .padding(horizontal = 24.dp, vertical = 12.dp),
         ) {
             if (state.mode == WorkspaceMode.Chat) {
@@ -395,7 +403,7 @@ private fun AssistantContent(
         val extra = if (state.isGeneratingChat) 1 else 0
         val target = state.chatMessages.size + extra - 1
         if (target >= 0) {
-            listState.animateScrollToItem(target)
+            listState.scrollToItem(target)
         }
     }
 
