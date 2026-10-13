@@ -127,11 +127,15 @@ jobs:
           if-no-files-found: error
 
       - name: Publish GitHub Release
-        if: github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ github.token }}
           APK_FILE: ${{ steps.package.outputs.file }}
         shell: bash
         run: |
           set -euo pipefail
-          gh release create "$GITHUB_REF_NAME"             "$APK_FILE"             "$APK_FILE.sha256"             --title "Transcribe Offline $GITHUB_REF_NAME"             --generate-notes
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            gh release create "$GITHUB_REF_NAME" "$APK_FILE" "$APK_FILE.sha256" --title "Transcribe Offline $GITHUB_REF_NAME" --generate-notes
+          else
+            TEST_TAG="chat-alpha5-build-${GITHUB_RUN_NUMBER}"
+            gh release create "$TEST_TAG" "$APK_FILE" "$APK_FILE.sha256" --target "$GITHUB_SHA" --title "Transcribe Offline 0.4.0-alpha5 (build ${GITHUB_RUN_NUMBER})" --prerelease --notes "Signed test build of the offline conversational Chat branch. Parakeet + Gemma, version 0.4.0-alpha5."
+          fi
