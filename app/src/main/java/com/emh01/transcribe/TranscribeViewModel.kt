@@ -351,7 +351,6 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
             runCatching {
                 textEngine.chat(
                     messages = conversation
-                        .takeLast(MAX_CONTEXT_MESSAGES)
                         .map { message ->
                             TextChatMessage(
                                 role = if (message.role == ChatRole.User) {
@@ -716,6 +715,5 @@ private const val MAX_SAVED_CHAT_MESSAGES = 40
 private const val MAX_SAVED_CONVERSATIONS = 50
 private const val MAX_GLOSSARY_CHARS = 500
 private const val MAX_CHAT_INPUT_CHARS = 3_000
-private const val MAX_CONTEXT_MESSAGES = 10
 private const val DEFAULT_GLOSSARY =
     "Esther María, Amarilys, Rodovaldo, Guillermina, Alejandro, Martín, Romel, Daniel"

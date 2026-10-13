@@ -123,8 +123,8 @@ jobs:
             exit 1
           fi
           if [[ "$GITHUB_REF_NAME" == "feature/offline-chat-assistant" ]]; then
-            test "$VERSION" = "0.4.0-alpha10"
-            test "$CODE" = "19"
+            test "$VERSION" = "0.4.0-alpha11"
+            test "$CODE" = "20"
           fi
           echo "name=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Verified APK version $VERSION (code $CODE)"
@@ -139,7 +139,7 @@ jobs:
           else
             VERSION="${{ steps.version.outputs.name }}-${GITHUB_SHA:0:7}"
           fi
-          OUTPUT="TranscribeOffline-${VERSION}-official.apk"
+          OUTPUT="Loquia-${VERSION}-official.apk"
           cp app/build/outputs/apk/release/app-release.apk "$OUTPUT"
           echo "file=$OUTPUT" >> "$GITHUB_OUTPUT"
           sha256sum "$OUTPUT" | tee "$OUTPUT.sha256"
@@ -147,7 +147,7 @@ jobs:
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: transcribe-offline-signed-release
+          name: loquia-signed-release
           path: |
             ${{ steps.package.outputs.file }}
             ${{ steps.package.outputs.file }}.sha256
@@ -169,5 +169,5 @@ jobs:
             OPTIONS=(--prerelease)
           fi
           gh release create "$TAG" "$APK_FILE" "$APK_FILE.sha256" \
-            --target "$GITHUB_SHA" --title "Transcribe Offline ${{ steps.version.outputs.name }}" \
+            --target "$GITHUB_SHA" --title "Loquia ${{ steps.version.outputs.name }}" \
             --generate-notes "${OPTIONS[@]}"

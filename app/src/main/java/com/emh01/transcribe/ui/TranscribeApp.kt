@@ -9,6 +9,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -61,6 +63,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -71,6 +74,7 @@ import com.emh01.transcribe.ChatMessage
 import com.emh01.transcribe.ChatConversation
 import com.emh01.transcribe.ChatRole
 import com.emh01.transcribe.ChatVoiceState
+import com.emh01.transcribe.R
 import com.emh01.transcribe.TranscribeStage
 import com.emh01.transcribe.TranscribeUiState
 import com.emh01.transcribe.TranscribeViewModel
@@ -252,14 +256,20 @@ private fun TranscribeScreen(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    Image(
+                        painter = painterResource(R.drawable.loquia_logo_mark),
+                        contentDescription = "Logo de Loquia",
+                        modifier = Modifier.size(42.dp),
+                    )
+                    Spacer(Modifier.width(10.dp))
                     Column {
                         Text(
-                            text = "Transcribe",
+                            text = "Loquia",
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
-                            text = "Privado · sin conexión · v$installedVersion",
+                            text = "Asistente de voz · privado · local · sin conexión · v$installedVersion",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -286,6 +296,7 @@ private fun TranscribeScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .navigationBarsPadding()
+                .imePadding()
                 .padding(horizontal = 24.dp, vertical = 12.dp),
         ) {
             if (state.mode == WorkspaceMode.Chat) {

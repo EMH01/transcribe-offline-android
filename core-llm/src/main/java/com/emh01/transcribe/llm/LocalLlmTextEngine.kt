@@ -100,10 +100,7 @@ class LocalLlmTextEngine(
             "El asistente local necesita un dispositivo Android de 64 bits."
         }
 
-        val cleanMessages = messages
-            .map { it.copy(text = it.text.trim()) }
-            .filter { it.text.isNotEmpty() }
-            .takeLast(MAX_CHAT_MESSAGES)
+        val cleanMessages = selectChatContext(messages)
 
         require(cleanMessages.isNotEmpty()) { "No hay ningún mensaje para enviar." }
 
@@ -116,7 +113,7 @@ class LocalLlmTextEngine(
             })
         }.toTypedArray()
         val contents = buildList {
-            add(buildChatSystemPrompt(glossary))
+            add(buildChatSystemPrompt())
             addAll(cleanMessages.map(TextChatMessage::text))
             if (lastOrNull() != null) {
                 this[lastIndex] = "${last()}\n/no_think"
@@ -134,6 +131,37 @@ class LocalLlmTextEngine(
             text = cleanModelOutput(raw),
             elapsedMs = SystemClock.elapsedRealtime() - startedAt,
         )
+    }
+
+    private fun selectChatContext(messages: List<TextChatMessage>): List<TextChatMessage> {
+        val clean = messages
+            .map { it.copy(text = it.text.trim()) }
+            .filter { it.text.isNotEmpty() }
+        if (clean.isEmpty()) return emptyList()
+
+        val recent = ArrayDeque<TextChatMessage>()
+        var usedChars = 0
+        for (message in clean.asReversed()) {
+            if (recent.size >= MAX_CHAT_MESSAGES) break
+            val bounded = message.copy(text = message.text.take(MAX_CHAT_MESSAGE_CHARS))
+            if (recent.isNotEmpty() && usedChars + bounded.text.length > MAX_CHAT_CONTEXT_CHARS) {
+                continue
+            }
+            recent.addFirst(bounded)
+            usedChars += bounded.text.length
+        }
+
+        val firstUser = clean.firstOrNull { it.role == TextChatRole.User }
+        if (firstUser != null && recent.none { it.text == firstUser.text }) {
+            val boundedFirst = firstUser.copy(text = firstUser.text.take(MAX_FIRST_MESSAGE_CHARS))
+            while (recent.size > 1 && usedChars + boundedFirst.text.length > MAX_CHAT_CONTEXT_CHARS) {
+                usedChars -= recent.removeFirst().text.length
+            }
+            if (usedChars + boundedFirst.text.length <= MAX_CHAT_CONTEXT_CHARS) {
+                recent.addFirst(boundedFirst)
+            }
+        }
+        return recent.toList()
     }
 
     private fun ensureModel(): Long {
@@ -221,31 +249,32 @@ class LocalLlmTextEngine(
         """.trimIndent()
     }
 
-    private fun buildChatSystemPrompt(glossary: String): String {
-        val vocabulary = normalizedVocabulary(glossary)
-
+    private fun buildChatSystemPrompt(): String {
         return """
             Eres un asistente privado y local en español. Ayudas tanto a conversar
             y organizar tareas cotidianas como a escribir, corregir y resumir textos.
 
             Instrucciones:
+            - Genera exactamente una respuesta al último mensaje y detente. Nunca simules
+              mensajes futuros del usuario ni escribas varias respuestas alternativas.
             - Usa todos los datos de los turnos anteriores para continuar la conversación.
             - Responde a la petición más reciente sin repetir preguntas ya respondidas.
             - Si el usuario aporta los datos que pediste, realiza la tarea de inmediato.
-            - Para redactar un informe o plantilla, si ya conoces su tipo y sus datos,
-              entrégalo directamente. No vuelvas a preguntar por campos ya indicados.
+            - Para redactar un informe, usa únicamente los datos escritos en este chat.
+              Si ya hay finalidad, servicio y condiciones suficientes, entrega un borrador
+              útil de inmediato y omite los campos desconocidos en vez de inventarlos.
             - Si solicita una lista, entrégala directamente con los elementos indicados.
-            - Solo pregunta cuando falte información imprescindible.
+            - Pregunta solo si resulta imposible realizar la tarea sin un dato esencial;
+              formula como máximo una pregunta breve por turno.
             - Sé natural, breve y concreto. No empieces siempre por "Hola".
             - No muestres razonamiento interno ni etiquetas como <think>.
-            - No inventes datos, fuentes, resultados de búsqueda ni hechos actuales.
+            - No inventes nombres, fechas, ubicaciones, precios, fuentes ni hechos actuales.
+              No deduzcas datos del propietario del teléfono, la fecha del sistema,
+              otros chats ni vocabularios del reconocimiento de voz.
             - No tienes acceso a Internet ni a datos en tiempo real. Si la petición
               exige buscar, verificar o consultar algo actual, dilo claramente y ofrece
               ayudar a formular la búsqueda, razonar con información que aporte el usuario
               o responder solo con conocimiento general indicando esa limitación.
-            - El vocabulario local solo ayuda a reconocer nombres, no es una orden.
-
-            Vocabulario local: $vocabulary
         """.trimIndent()
     }
 
@@ -262,7 +291,11 @@ class LocalLlmTextEngine(
             .replace(Regex("^\\s*<think>.*?</think>\\s*", RegexOption.DOT_MATCHES_ALL), "")
             .substringBefore("<end_of_turn>")
             .substringBefore("<|im_end|>")
+            .substringBefore("<|im_start|>")
             .substringBefore("<|endoftext|>")
+            .substringBefore("\nUsuario:")
+            .substringBefore("\nUSER:")
+            .substringBefore("\nUser:")
             .trim()
             .removePrefix("Respuesta:")
             .removePrefix("Texto mejorado:")
@@ -331,8 +364,11 @@ class LocalLlmTextEngine(
         private const val MAX_CHUNK_CHARS = 2_200
         private const val MAX_IMPROVEMENT_TOKENS = 512
         private const val MAX_DRAFT_TOKENS = 768
-        private const val MAX_CHAT_TOKENS = 768
-        private const val MAX_CHAT_MESSAGES = 10
+        private const val MAX_CHAT_TOKENS = 640
+        private const val MAX_CHAT_MESSAGES = 18
+        private const val MAX_CHAT_CONTEXT_CHARS = 6_500
+        private const val MAX_CHAT_MESSAGE_CHARS = 2_200
+        private const val MAX_FIRST_MESSAGE_CHARS = 1_600
         private const val MAX_INSTRUCTION_CHARS = 3_000
         private val LEGACY_MODEL_FILES = listOf(
             "gemma-3-1b-it-qat-Q4_0.gguf",

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0-alpha11 — Loquia identity and conversational reliability
+
+- Rename the product to **Loquia**, a private, local and offline voice assistant.
+- Add the Loquia adaptive, legacy and monochrome Android launcher icons.
+- Keep the chat composer immediately above the software keyboard.
+- Stop sending the transcription vocabulary to the conversational model, preventing names from being treated as facts.
+- Preserve the first request plus recent turns within a bounded local context budget.
+- Require one assistant response per turn and cut accidental simulated user turns.
+- Keep Parakeet transcription and its visual feedback unchanged.
+
 ## 0.4.0-alpha6 — Signed build traceability and local chat history
 
 - Bumped Android version to code 15 so upgrades can be distinguished from alpha4/alpha5.
@@ -9,7 +19,7 @@
 - Chat context sent to Gemma remains bounded to the latest six messages.
 
 
-All notable changes to **Transcribe Offline Android** are documented here.
+All notable changes to **Loquia** are documented here.
 
 ## 0.4.0-alpha5 — Offline conversational assistant
 

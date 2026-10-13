@@ -1,6 +1,6 @@
-# Transcribe Offline Android
+# Loquia
 
-**Transcribe Offline Android** is a lightweight, privacy-first speech-to-text application designed to run **entirely on-device**.
+**Loquia** is a private, local and offline voice assistant that listens, transcribes and converses **entirely on-device**. Its name comes from *loqui* ("to speak").
 
 It is intended for people and environments where reliable access to cloud AI cannot be assumed: intermittent or expensive connectivity, slow networks, older hardware, limited infrastructure, or regions and networks where modern online services are unavailable or restricted.
 
@@ -26,16 +26,16 @@ The goal is not to reproduce a large cloud AI stack on a low-end phone. It is to
 - **Modular architecture** — the speech stack can later be reused by a fully local LLM assistant.
 - **Reproducible builds** — the model and `whisper.cpp` revision are pinned and verified.
 
-## Current experiment: 0.4.0-alpha6
+## Current experiment: 0.4.0-alpha11
 
-Version **0.4.0-alpha6** keeps the successful **Parakeet TDT 0.6B v3 Q4_0 + Gemma 3 1B IT QAT Q4_0** pairing and changes only the conversational UX.
+Version **0.4.0-alpha11** combines **Parakeet TDT 0.6B v3 Q4_0** transcription with the compact **Qwen3 0.6B Q4_0** conversational model for constrained Android devices.
 
 The app now has two clearly separated modes:
 
 - **Transcribe** — record speech, obtain editable local transcription, and optionally use **✨ Improve writing** to clean punctuation and wording without changing the intended meaning.
-- **Chat** — type normally or tap the microphone to dictate a message. Parakeet puts the recognized text into the editable composer first; nothing is sent to Gemma until the user presses send. The last 6 messages provide bounded conversational context. Up to 40 messages are saved locally across app restarts; starting a new conversation clears the saved history.
+- **Chat** — type normally or tap the microphone to dictate a message. Parakeet puts the recognized text into the editable composer first; nothing is processed by Qwen until the user presses send. Conversations are stored locally, can be reopened or permanently deleted, and a bounded context window keeps inference practical on the target phone.
 
-The existing editable local vocabulary still feeds the local correction layer and the LLM. Parakeet itself does not expose Whisper-style prompt biasing, so this experiment deliberately measures its raw ASR behavior plus the same conservative post-correction already used by the app. The Android manifest still contains no `INTERNET` permission: both speech recognition and text generation run on-device after installation.
+The editable vocabulary feeds only the local transcription correction layer. It is deliberately excluded from conversational prompts so names are not mistaken for facts. The Android manifest contains no `INTERNET` permission: both speech recognition and text generation run on-device after installation.
 
 The previous Whisper Large V3 Turbo benchmark produced good text but took roughly 46–47 seconds for only a few seconds of speech on a Pixel 9, making it unsuitable for the intended low-end Android target. Alpha4 therefore tests a different ASR architecture rather than a larger Whisper model.
 
@@ -74,9 +74,9 @@ These changes improve both **latency** and **transcription stability** on constr
 
 ## Install and test builds
 
-The signed Android package has application ID `com.emh01.transcribeoffline`, version name `0.4.0-alpha6` and version code `15`. The `Publish signed release` workflow checks the packaged identity and version before publishing a prerelease from `feature/offline-chat-assistant`. The signing certificate is validated against the pinned SHA-256 fingerprint. A green debug CI build alone does **not** mean a signed APK was published. Only install the APK attached to the matching GitHub prerelease; the signed package can update an existing app only if the signing certificate matches.
+The signed Android package keeps application ID `com.emh01.transcribeoffline` so it updates existing installations. The current version is `0.4.0-alpha11` (code `20`). The release workflow verifies the packaged identity and version before publishing the signed prerelease. Only install the APK attached to the matching GitHub Release.
 
-Chat requires a 64-bit Android device in the current alpha; 32-bit devices may still support transcription but not local Gemma generation. Test on the target device before treating this version as stable. The chat history is stored in local app preferences, not encrypted; do not use it for sensitive content on a shared device.
+Chat requires a 64-bit Android device in the current alpha; 32-bit devices may still support transcription but not local Qwen generation. Test on the target device before treating this version as stable. The chat history is stored in local app preferences, not encrypted; do not use it for sensitive content on a shared device.
 
 ## Architecture
 
@@ -105,7 +105,7 @@ Chat requires a 64-bit Android device in the current alpha; 32-bit devices may s
        └── :core-llm
              ├── LocalLlmTextEngine
              ├── JNI bridge
-             └── llama.cpp + Gemma 3 1B IT QAT Q4_0
+             └── llama.cpp + Qwen3 0.6B Q4_0
 ```
 
 The UI does not depend directly on a specific ASR. It talks to the `SpeechToTextEngine` abstraction, which keeps the application replaceable and reusable.
@@ -116,7 +116,7 @@ That separation is intentional: Whisper and Parakeet can be benchmarked behind t
 
 The Android manifest intentionally contains **no `INTERNET` permission**.
 
-At build time, the development machine obtains the native inference sources and model weights needed for the selected build. Parakeet Q4_0 and the Gemma GGUF are SHA-256 verified before packaging.
+At build time, the development machine obtains the native inference sources and model weights needed for the selected build. Parakeet Q4_0 and the Qwen GGUF are SHA-256 verified before packaging.
 
 The final APK contains both model families and native inference code. On the phone, transcription, writing improvement and multi-turn chat therefore remain available in airplane mode.
 
@@ -158,7 +158,7 @@ This makes performance work measurable rather than subjective.
 - **Parakeet transcription ABIs:** `arm64-v8a`, `armeabi-v7a`
 - **Local LLM writing features:** `arm64-v8a` only in the current alpha
 - **Audio input:** 16-bit PCM, mono, 16 kHz
-- Parakeet and Gemma inference run on dedicated background threads so the Compose UI remains responsive.
+- Parakeet and Qwen inference run on dedicated background threads so the Compose UI remains responsive.
 
 ## User experience
 
@@ -251,6 +251,6 @@ The long-term goal is to reuse the offline speech stack as the input layer for a
 
 ## Third-party software
 
-`whisper.cpp` and `llama.cpp` are developed by Georgi Gerganov and contributors and are used under their MIT licenses. Parakeet TDT 0.6B v3 is based on NVIDIA's model distributed under CC-BY-4.0. Gemma 3 model weights are provided under the Gemma Terms of Use.
+`whisper.cpp` and `llama.cpp` are developed by Georgi Gerganov and contributors and are used under their MIT licenses. Parakeet TDT 0.6B v3 is based on NVIDIA's model distributed under CC-BY-4.0. Qwen3 model weights are distributed under Apache-2.0.
 
 See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for details.
