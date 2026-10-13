@@ -129,7 +129,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${{ steps.version.outputs.name }}"
           OUTPUT="Loquia-${VERSION}-official.apk"
           cp app/build/outputs/apk/release/app-release.apk "$OUTPUT"
           echo "file=$OUTPUT" >> "$GITHUB_OUTPUT"
@@ -153,6 +153,11 @@ jobs:
         run: |
           set -euo pipefail
           TAG="$GITHUB_REF_NAME"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::notice::Release $TAG already exists. Keeping its existing assets unchanged."
+            echo "The newly built signed APK remains available as a workflow artifact."
+            exit 0
+          fi
           gh release create "$TAG" "$APK_FILE" "$APK_FILE.sha256" \
             --target "$GITHUB_SHA" --title "Loquia ${{ steps.version.outputs.name }}" \
             --generate-notes
