@@ -4,7 +4,7 @@
 
 It is intended for people and environments where reliable access to cloud AI cannot be assumed: intermittent or expensive connectivity, slow networks, older hardware, limited infrastructure, or regions and networks where modern online services are unavailable or restricted.
 
-The current alpha records speech locally and transcribes it with **Parakeet TDT 0.6B v3 Q4_0** through the Parakeet runtime in `whisper.cpp`. Once installed, it requires **no account, API key, server, cloud service, or Internet connection** to perform transcription.
+Loquia records speech locally with **Parakeet TDT 0.6B v3 Q4_0** and provides local conversation with **LFM2.5 1.2B Instruct Q4_K_M**. Once installed, it requires **no account, API key, server, cloud service, or Internet connection** for transcription or chat.
 
 ## Why this project exists
 
@@ -76,7 +76,7 @@ These changes improve both **latency** and **transcription stability** on constr
 
 The signed Android package keeps application ID `com.emh01.transcribeoffline` so it updates existing installations. The current stable version is `0.4.0` (code `22`). The release workflow verifies the packaged identity and version before publishing the signed release. Only install the APK attached to the matching GitHub Release.
 
-Chat requires a 64-bit Android device in the current alpha; 32-bit devices may still support transcription but not local LFM generation. Test on the target device before treating this version as stable. The chat history is stored in local app preferences, not encrypted; do not use it for sensitive content on a shared device.
+Chat requires a 64-bit Android device; 32-bit devices may still support transcription but not local LFM generation. The chat history is stored in local app preferences, not encrypted; do not use it for sensitive content on a shared device.
 
 ## Architecture
 
@@ -156,7 +156,7 @@ This makes performance work measurable rather than subjective.
 
 - **Minimum Android:** 8.0 / API 26
 - **Parakeet transcription ABIs:** `arm64-v8a`, `armeabi-v7a`
-- **Local LLM writing features:** `arm64-v8a` only in the current alpha
+- **Local LLM writing features:** `arm64-v8a` only
 - **Audio input:** 16-bit PCM, mono, 16 kHz
 - Parakeet and LFM inference run on dedicated background threads so the Compose UI remains responsive.
 
@@ -211,6 +211,16 @@ F8:45:DB:90:80:06:0A:59:9D:80:00:99:34:52:93:D7:4C:7E:C4:24:51:49:E5:18:C8:43:0E
 Future stable APKs must be signed with the same private key so Android can install them as updates over the existing app.
 
 See [RELEASE_SIGNING.md](RELEASE_SIGNING.md).
+
+## License, attribution and the Loquia name
+
+The source code is licensed under [Apache-2.0](LICENSE). Contributions and
+forks are welcome, provided that applicable copyright, licence and attribution
+notices are preserved. See [NOTICE](NOTICE) and
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
+The Loquia name and visual identity are not granted for use that implies an
+official, endorsed or affiliated release. See [TRADEMARKS.md](TRADEMARKS.md).
 
 ## Project background
 
