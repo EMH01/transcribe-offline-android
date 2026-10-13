@@ -7,14 +7,9 @@ internal object LlamaNative {
 
     external fun loadModel(path: String): Long
 
-    /**
-     * The native layer applies the chat template embedded in the GGUF model.
-     * [userPrompt] must therefore contain plain user-visible instructions,
-     * not model-specific special tokens.
-     */
     external fun generate(
         modelPtr: Long,
-        userPrompt: String,
+        prompt: String,
         maxTokens: Int,
         threadCount: Int,
     ): String
