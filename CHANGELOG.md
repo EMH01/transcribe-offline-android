@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0-alpha6 — Signed build traceability and local chat history
+
+- Bumped Android version to code 15 so upgrades can be distinguished from alpha4/alpha5.
+- Persist up to 40 conversation messages in local app preferences, without network access.
+- Clear chat also deletes the saved local history.
+- Release workflow checks the packaged application ID and alpha6 version before publishing a signed prerelease APK.
+- Chat context sent to Gemma remains bounded to the latest six messages.
+
+
 All notable changes to **Transcribe Offline Android** are documented here.
 
 ## 0.4.0-alpha5 — Offline conversational assistant
