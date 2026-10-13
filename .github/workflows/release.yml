@@ -188,8 +188,8 @@ jobs:
           if gh release view "$TAG" >/dev/null 2>&1; then
             # Recover an existing release that was created without its APK.
             if gh release view "$TAG" --json assets --jq '.assets[].name' | grep -Fxq "$APK_FILE"; then
-              echo "::notice::Release $TAG already contains $APK_FILE; existing official assets are unchanged."
-              exit 0
+              echo "::error::Release $TAG already contains $APK_FILE. Bump versionName and versionCode before publishing a new APK; existing releases are never silently reused."
+              exit 1
             fi
             echo "Release $TAG exists but is missing $APK_FILE; uploading the signed APK."
             gh release upload "$TAG" "$APK_FILE" "$APK_FILE.sha256"
