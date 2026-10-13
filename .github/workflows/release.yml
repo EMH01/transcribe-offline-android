@@ -2,6 +2,7 @@ name: Publish signed release
 
 on:
   push:
+    branches: [ feature/offline-chat-assistant ]
     tags:
       - "v*"
   workflow_dispatch:
@@ -102,6 +103,28 @@ jobs:
           APK="app/build/outputs/apk/release/app-release.apk"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify             --verbose             --print-certs             "$APK"
 
+      - name: Verify packaged version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/release/app-release.apk"
+          BADGING="$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK")"
+          VERSION="$(printf '%s\n' "$BADGING" | sed -n "s/^package:.*versionName='\([^']*\)'.*/\1/p")"
+          CODE="$(printf '%s\n' "$BADGING" | sed -n "s/^package:.*versionCode='\([^']*\)'.*/\1/p")"
+          test -n "$VERSION"
+          test -n "$CODE"
+          if [[ "$GITHUB_REF_TYPE" == "tag" && "${GITHUB_REF_NAME#v}" != "$VERSION" ]]; then
+            echo "::error::Release tag does not match packaged version $VERSION"
+            exit 1
+          fi
+          if [[ "$GITHUB_REF_NAME" == "feature/offline-chat-assistant" ]]; then
+            test "$VERSION" = "0.4.0-alpha7"
+            test "$CODE" = "16"
+          fi
+          echo "name=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Verified APK version $VERSION (code $CODE)"
+
       - name: Name release APK
         id: package
         shell: bash
@@ -110,7 +133,7 @@ jobs:
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             VERSION="${GITHUB_REF_NAME#v}"
           else
-            VERSION="manual-${GITHUB_RUN_NUMBER}"
+            VERSION="${{ steps.version.outputs.name }}-${GITHUB_SHA:0:7}"
           fi
           OUTPUT="TranscribeOffline-${VERSION}-official.apk"
           cp app/build/outputs/apk/release/app-release.apk "$OUTPUT"
@@ -127,11 +150,20 @@ jobs:
           if-no-files-found: error
 
       - name: Publish GitHub Release
-        if: github.ref_type == 'tag'
+        if: github.ref_type == 'tag' || github.ref_name == 'feature/offline-chat-assistant'
         env:
           GH_TOKEN: ${{ github.token }}
           APK_FILE: ${{ steps.package.outputs.file }}
         shell: bash
         run: |
           set -euo pipefail
-          gh release create "$GITHUB_REF_NAME"             "$APK_FILE"             "$APK_FILE.sha256"             --title "Transcribe Offline $GITHUB_REF_NAME"             --generate-notes
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            TAG="$GITHUB_REF_NAME"
+            OPTIONS=()
+          else
+            TAG="chat-${{ steps.version.outputs.name }}-${GITHUB_SHA:0:7}"
+            OPTIONS=(--prerelease)
+          fi
+          gh release create "$TAG" "$APK_FILE" "$APK_FILE.sha256" \
+            --target "$GITHUB_SHA" --title "Transcribe Offline ${{ steps.version.outputs.name }}" \
+            --generate-notes "${OPTIONS[@]}"
