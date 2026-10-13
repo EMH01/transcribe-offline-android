@@ -60,6 +60,50 @@ std::string token_piece(const llama_vocab * vocab, llama_token token) {
     return std::string(buffer.data(), static_cast<size_t>(n));
 }
 
+std::string apply_model_chat_template(
+    llama_model * model,
+    const std::string & user_prompt
+) {
+    const char * tmpl = llama_model_chat_template(model, nullptr);
+    if (tmpl == nullptr) {
+        // Conservative fallback for a GGUF without an embedded chat template.
+        return user_prompt;
+    }
+
+    llama_chat_message message = {"user", user_prompt.c_str()};
+    std::vector<char> formatted(
+        std::max<size_t>(2048, user_prompt.size() * 2 + 512)
+    );
+
+    int32_t length = llama_chat_apply_template(
+        tmpl,
+        &message,
+        1,
+        true,
+        formatted.data(),
+        static_cast<int32_t>(formatted.size())
+    );
+
+    if (length > static_cast<int32_t>(formatted.size())) {
+        formatted.resize(static_cast<size_t>(length));
+        length = llama_chat_apply_template(
+            tmpl,
+            &message,
+            1,
+            true,
+            formatted.data(),
+            static_cast<int32_t>(formatted.size())
+        );
+    }
+
+    if (length < 0) {
+        log_error("Unable to apply model chat template");
+        return {};
+    }
+
+    return std::string(formatted.data(), static_cast<size_t>(length));
+}
+
 } // namespace
 
 extern "C"
@@ -86,7 +130,7 @@ Java_com_emh01_transcribe_llm_LlamaNative_loadModel(
     env->ReleaseStringUTFChars(path, model_path);
 
     if (model == nullptr) {
-        log_error("Unable to load local Qwen model");
+        log_error("Unable to load local LLM model");
         return 0L;
     }
 
@@ -99,22 +143,30 @@ Java_com_emh01_transcribe_llm_LlamaNative_generate(
     JNIEnv * env,
     jobject,
     jlong model_ptr,
-    jstring prompt,
+    jstring user_prompt,
     jint max_tokens,
     jint thread_count
 ) {
     auto * model = reinterpret_cast<llama_model *>(model_ptr);
-    if (model == nullptr || prompt == nullptr) {
+    if (model == nullptr || user_prompt == nullptr) {
         return env->NewStringUTF("");
     }
 
-    const char * prompt_chars = env->GetStringUTFChars(prompt, nullptr);
+    const char * prompt_chars = env->GetStringUTFChars(user_prompt, nullptr);
     if (prompt_chars == nullptr) {
         return env->NewStringUTF("");
     }
 
-    const std::string prompt_text(prompt_chars);
-    env->ReleaseStringUTFChars(prompt, prompt_chars);
+    const std::string raw_user_prompt(prompt_chars);
+    env->ReleaseStringUTFChars(user_prompt, prompt_chars);
+
+    const std::string prompt_text = apply_model_chat_template(
+        model,
+        raw_user_prompt
+    );
+    if (prompt_text.empty()) {
+        return env->NewStringUTF("");
+    }
 
     const llama_vocab * vocab = llama_model_get_vocab(model);
     const int32_t n_prompt = -llama_tokenize(
@@ -147,10 +199,19 @@ Java_com_emh01_transcribe_llm_LlamaNative_generate(
         return env->NewStringUTF("");
     }
 
-    const int32_t safe_max_tokens = std::clamp(static_cast<int32_t>(max_tokens), 32, 768);
-    const int32_t safe_threads = std::clamp(static_cast<int32_t>(thread_count), 1, 6);
+    const int32_t safe_max_tokens = std::clamp(
+        static_cast<int32_t>(max_tokens),
+        32,
+        768
+    );
+    const int32_t safe_threads = std::clamp(
+        static_cast<int32_t>(thread_count),
+        1,
+        6
+    );
     const int32_t required_context = n_prompt + safe_max_tokens + 8;
 
+    // Keep memory use bounded on phones even though Gemma supports a larger context.
     if (required_context > 4096) {
         log_error("Prompt exceeds local LLM context limit");
         return env->NewStringUTF("");
@@ -169,9 +230,13 @@ Java_com_emh01_transcribe_llm_LlamaNative_generate(
         return env->NewStringUTF("");
     }
 
-    llama_sampler_chain_params sampler_params = llama_sampler_chain_default_params();
+    llama_sampler_chain_params sampler_params =
+        llama_sampler_chain_default_params();
     sampler_params.no_perf = true;
     llama_sampler * sampler = llama_sampler_chain_init(sampler_params);
+
+    // Greedy decoding is intentional here: the app is a writing utility, not
+    // a creative chatbot, so repeatability and factual restraint matter more.
     llama_sampler_chain_add(sampler, llama_sampler_init_greedy());
 
     llama_batch_ext * batch = llama_batch_ext_init(ctx);

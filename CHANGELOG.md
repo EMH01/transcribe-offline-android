@@ -2,6 +2,32 @@
 
 All notable changes to **Transcribe Offline Android** are documented here.
 
+## 0.4.0-alpha2 — Gemma 3 1B writing benchmark
+
+Status: **experimental device benchmark**
+
+### Changed
+
+- Replaced Qwen2.5 0.5B Q4_0 with **Gemma 3 1B IT QAT Q4_0** for local writing.
+- Kept the same Transcribe / Redactar UI so quality and latency can be compared directly on the same phone.
+- Native generation now applies the chat template embedded in the GGUF instead of hard-coding Qwen ChatML tokens.
+- Strengthened the drafting prompt to avoid invented placeholders such as `[Nombre del usuario]`.
+- Previous Qwen model files are removed from app-private storage when Gemma is prepared after an update.
+
+### Why
+
+The 0.5B alpha preserved the offline architecture and generated quickly, but real-device testing showed weak instruction following for Spanish drafting. Alpha2 tests whether a 1B model is a better quality/size compromise.
+
+### Model
+
+- Gemma 3 1B IT QAT Q4_0
+- Approximate GGUF size: 720 MB
+- SHA-256: `ef60e4e91a738c99ae9976b050657dfe68a4007a0ccca121b55ec0c413dccd58`
+
+### Privacy
+
+The app still requests no `INTERNET` permission. Whisper and Gemma inference run entirely on-device.
+
 ## 0.4.0-alpha1 — Offline writing assistant
 
 Status: **experimental device benchmark**
@@ -26,7 +52,7 @@ The local writing model is currently enabled on 64-bit Android devices. The exis
 
 ### Size
 
-The Qwen Q4_K_M model is approximately 429 MB, so this alpha must be tested on real target hardware before promotion to a stable release.
+The Qwen Q4_0 model is approximately 429 MB, so this alpha must be tested on real target hardware before promotion to a stable release.
 
 ## 0.3.4 — Proper-name phonetic refinement
 

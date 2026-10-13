@@ -5,7 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.emh01.transcribe.audio.PcmAudioRecorder
 import com.emh01.transcribe.audio.VoiceActivityTrimmer
-import com.emh01.transcribe.llm.LocalQwenTextEngine
+import com.emh01.transcribe.llm.LocalLlmTextEngine
 import com.emh01.transcribe.speech.LocalVocabularyCorrector
 import com.emh01.transcribe.whisper.WhisperBaseEngine
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,9 +17,9 @@ import kotlinx.coroutines.launch
 class TranscribeViewModel(application: Application) : AndroidViewModel(application) {
     private val recorder = PcmAudioRecorder()
     private val speechEngine = WhisperBaseEngine(application)
-    private val textEngineLazy = lazy { LocalQwenTextEngine(application) }
+    private val textEngineLazy = lazy { LocalLlmTextEngine(application) }
     private val textEngine by textEngineLazy
-    private val llmAvailable = LocalQwenTextEngine.isSupportedDevice()
+    private val llmAvailable = LocalLlmTextEngine.isSupportedDevice()
 
     private val preferences = application.getSharedPreferences(
         "transcribe_preferences",

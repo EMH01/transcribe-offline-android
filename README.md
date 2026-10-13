@@ -26,9 +26,9 @@ The goal is not to reproduce a large cloud AI stack on a low-end phone. It is to
 - **Modular architecture** — the speech stack can later be reused by a fully local LLM assistant.
 - **Reproducible builds** — the model and `whisper.cpp` revision are pinned and verified.
 
-## Current experiment: 0.4.0-alpha1
+## Current experiment: 0.4.0-alpha2
 
-Version **0.4.0-alpha1** keeps the validated Whisper Base Q5_1 transcription pipeline and adds an experimental **fully local writing assistant** based on **Qwen2.5 0.5B Instruct Q4_0** through `llama.cpp`.
+Version **0.4.0-alpha2** keeps the validated Whisper Base Q5_1 transcription pipeline and replaces the first 0.5B writing experiment with **Gemma 3 1B IT QAT Q4_0** through `llama.cpp`.
 
 The app now has two clearly separated modes:
 
@@ -37,7 +37,7 @@ The app now has two clearly separated modes:
 
 The existing editable local vocabulary is shared by both Whisper and the local LLM so uncommon names and terms can be preserved across transcription and writing. The Android manifest still contains no `INTERNET` permission: both speech recognition and text generation run on-device after installation.
 
-This alpha intentionally keeps **0.3.4** as the known-good transcription baseline while the larger local LLM is benchmarked on real hardware. The Qwen GGUF is about **429 MB**, so storage, RAM usage and generation speed must be validated on the target phone before this line is considered stable.
+The first 0.4.0 alpha proved that the architecture works fully offline, but Qwen2.5 0.5B was too weak for reliable instruction-driven drafting on the target phone. Alpha2 keeps the same UI and flow so **Gemma 3 1B** can be compared directly. Its Q4_0 GGUF is about **720 MB**, so storage, RAM usage and generation speed must be validated on the same device before this line is considered stable.
 
 The trade-off is deliberate: Base is larger and may take longer to process than Tiny. The app therefore continues to expose audio duration, useful-voice duration, processing time and RTF so the accuracy/performance balance can be measured on the actual device.
 
@@ -97,9 +97,9 @@ These changes improve both **latency** and **transcription stability** on constr
        │     └── TextImprovementEngine contract
        │
        └── :core-llm
-             ├── LocalQwenTextEngine
+             ├── LocalLlmTextEngine
              ├── JNI bridge
-             └── llama.cpp + Qwen2.5 0.5B Instruct Q4_0
+             └── llama.cpp + Gemma 3 1B IT QAT Q4_0
 ```
 
 The UI does not depend directly on Whisper. It talks to the `SpeechToTextEngine` abstraction, which keeps the application replaceable and reusable.
@@ -110,7 +110,7 @@ That separation is intentional: a future local assistant can reuse `core-audio`,
 
 The Android manifest intentionally contains **no `INTERNET` permission**.
 
-At build time, the development machine obtains the native inference sources and model weights needed for the selected build. Whisper Base and the Qwen GGUF are SHA-256 verified before packaging.
+At build time, the development machine obtains the native inference sources and model weights needed for the selected build. Whisper Base and the Gemma GGUF are SHA-256 verified before packaging.
 
 The final APK contains both model families and native inference code. On the phone, transcription, writing improvement and instruction-driven drafting therefore remain available in airplane mode.
 
@@ -152,7 +152,7 @@ This makes performance work measurable rather than subjective.
 - **Whisper transcription ABIs:** `arm64-v8a`, `armeabi-v7a`
 - **Local LLM writing features:** `arm64-v8a` only in the current alpha
 - **Audio input:** 16-bit PCM, mono, 16 kHz
-- Whisper and Qwen inference run on dedicated background threads so the Compose UI remains responsive.
+- Whisper and Gemma inference run on dedicated background threads so the Compose UI remains responsive.
 
 ## User experience
 
@@ -218,7 +218,7 @@ The objective is not to present AI-generated code as expertise by itself. It is 
 
 Near-term work:
 
-- benchmark Qwen2.5 0.5B Q4_0 generation speed and RAM usage on the target phone;
+- compare Gemma 3 1B generation quality and latency against the observed Qwen2.5 0.5B alpha1 result;
 - validate the **Improve writing** prompt against real Spanish dictation;
 - validate voice-driven **Write** instructions and formatting requests;
 - compare smaller quantizations only if device constraints require it;
@@ -245,6 +245,6 @@ The long-term goal is to reuse the offline speech stack as the input layer for a
 
 ## Third-party software
 
-`whisper.cpp` and `llama.cpp` are developed by Georgi Gerganov and contributors and are used under their MIT licenses. The Qwen2.5 model is distributed by Qwen under the Apache 2.0 license.
+`whisper.cpp` and `llama.cpp` are developed by Georgi Gerganov and contributors and are used under their MIT licenses. Gemma 3 model weights are provided under the Gemma Terms of Use.
 
 See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for details.

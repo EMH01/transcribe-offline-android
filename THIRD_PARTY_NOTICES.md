@@ -23,14 +23,14 @@ Project: https://github.com/ggml-org/llama.cpp
 
 License: MIT.
 
-## Qwen2.5 0.5B Instruct Q4_0
+## Gemma 3 1B IT QAT Q4_0
 
-The experimental writing assistant uses `Qwen/Qwen2.5-0.5B-Instruct-GGUF` from Hugging Face.
+The alpha2 writing assistant uses `ggml-org/gemma-3-1b-it-qat-GGUF` from Hugging Face.
 
-Model file: `qwen2.5-0.5b-instruct-q4_0.gguf`
+Model file: `gemma-3-1b-it-qat-Q4_0.gguf`
 
 SHA-256:
 
-`7671c0c304e6ce5a7fc577bcb12aba01e2c155cc2efd29b2213c95b18edaf6ed`
+`ef60e4e91a738c99ae9976b050657dfe68a4007a0ccca121b55ec0c413dccd58`
 
-License: Apache 2.0.
+Terms: Gemma Terms of Use.
