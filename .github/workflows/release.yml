@@ -145,14 +145,14 @@ jobs:
           if-no-files-found: error
 
       - name: Publish GitHub Release
-        if: github.ref_type == 'tag'
+        if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
           APK_FILE: ${{ steps.package.outputs.file }}
         shell: bash
         run: |
           set -euo pipefail
-          TAG="$GITHUB_REF_NAME"
+          TAG="v${{ steps.version.outputs.name }}"
           if gh release view "$TAG" >/dev/null 2>&1; then
             # Recover an existing release that was created without its APK.
             if gh release view "$TAG" --json assets --jq '.assets[].name' | grep -Fxq "$APK_FILE"; then
