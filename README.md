@@ -22,7 +22,7 @@ Loquia does not request Android's `INTERNET` permission. Audio transcription, wr
 
 Get the signed APK from [GitHub Releases](https://github.com/EMH01/transcribe-offline-android/releases). Choose the APK attached to the release you want to install.
 
-**Current version:** 0.4.0
+**Current version:** 0.4.1
 
 **Requirements:** Android 8.0 (API 26) or later. Local chat and writing assistance require a **64-bit ARM** device; supported 32-bit ARM devices can use transcription without the local LLM. Performance depends on available memory and processor speed.
 
