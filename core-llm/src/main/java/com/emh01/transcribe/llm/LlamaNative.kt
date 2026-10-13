@@ -19,5 +19,14 @@ internal object LlamaNative {
         threadCount: Int,
     ): String
 
+    /** Sends real system/user/assistant turns through the model's chat template. */
+    external fun generateConversation(
+        modelPtr: Long,
+        roles: Array<String>,
+        contents: Array<String>,
+        maxTokens: Int,
+        threadCount: Int,
+    ): String
+
     external fun freeModel(modelPtr: Long)
 }
