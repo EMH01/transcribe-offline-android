@@ -23,8 +23,8 @@ android {
         applicationId = "com.emh01.transcribeoffline"
         minSdk = 26
         targetSdk = 35
-        versionCode = 16
-        versionName = "0.4.0-alpha7"
+        versionCode = 18
+        versionName = "0.4.0-alpha9"
     }
 
     signingConfigs {
