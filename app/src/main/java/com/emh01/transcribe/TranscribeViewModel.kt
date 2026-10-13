@@ -1,6 +1,8 @@
 package com.emh01.transcribe
 
 import android.app.Application
+import org.json.JSONArray
+import org.json.JSONObject
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.emh01.transcribe.audio.PcmAudioRecorder
@@ -38,6 +40,7 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
         TranscribeUiState(
             glossary = glossary,
             llmAvailable = llmAvailable,
+            chatMessages = restoreChatMessages(),
         ),
     )
     val uiState: StateFlow<TranscribeUiState> = _uiState.asStateFlow()
@@ -327,6 +330,7 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
             text = input,
         )
         val conversation = current.chatMessages + userMessage
+        saveChatMessages(conversation)
 
         _uiState.update {
             it.copy(
@@ -369,6 +373,7 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
                         chatError = null,
                     )
                 }
+                saveChatMessages(_uiState.value.chatMessages)
             }.onFailure { error ->
                 _uiState.update {
                     it.copy(
@@ -381,12 +386,39 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    private fun restoreChatMessages(): List<ChatMessage> = runCatching {
+        val stored = preferences.getString(KEY_CHAT_HISTORY, null) ?: return@runCatching emptyList()
+        val array = JSONArray(stored)
+        (0 until array.length()).mapNotNull { index ->
+            val entry = array.optJSONObject(index) ?: return@mapNotNull null
+            val role = when (entry.optString("role")) {
+                "user" -> ChatRole.User
+                "assistant" -> ChatRole.Assistant
+                else -> return@mapNotNull null
+            }
+            val message = entry.optString("text").take(MAX_CHAT_INPUT_CHARS)
+            if (message.isBlank()) null else ChatMessage(role = role, text = message)
+        }.takeLast(MAX_SAVED_CHAT_MESSAGES)
+    }.getOrDefault(emptyList())
+
+    private fun saveChatMessages(messages: List<ChatMessage>) {
+        val array = JSONArray()
+        messages.takeLast(MAX_SAVED_CHAT_MESSAGES).forEach { message ->
+            array.put(JSONObject().apply {
+                put("role", if (message.role == ChatRole.User) "user" else "assistant")
+                put("text", message.text)
+            })
+        }
+        preferences.edit().putString(KEY_CHAT_HISTORY, array.toString()).apply()
+    }
+
     fun clearChat() {
         val current = _uiState.value
         if (current.isGeneratingChat ||
             current.chatVoiceState != ChatVoiceState.Idle
         ) return
 
+        preferences.edit().remove(KEY_CHAT_HISTORY).apply()
         _uiState.update {
             it.copy(
                 chatInput = "",
@@ -540,6 +572,8 @@ private data class SpeechPayload(
 )
 
 private const val KEY_GLOSSARY = "local_glossary"
+private const val KEY_CHAT_HISTORY = "local_chat_history"
+private const val MAX_SAVED_CHAT_MESSAGES = 40
 private const val MAX_GLOSSARY_CHARS = 500
 private const val MAX_CHAT_INPUT_CHARS = 3_000
 private const val MAX_CONTEXT_MESSAGES = 6
