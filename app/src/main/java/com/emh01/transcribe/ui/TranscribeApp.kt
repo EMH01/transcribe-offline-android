@@ -220,6 +220,10 @@ private fun TranscribeScreen(
     onGlossaryRequested: () -> Unit,
 ) {
     val context = LocalContext.current
+    @Suppress("DEPRECATION")
+    val installedVersion = remember(context) {
+        context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "desconocida"
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -242,7 +246,7 @@ private fun TranscribeScreen(
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
-                            text = "Privado · sin conexión",
+                            text = "Privado · sin conexión · v$installedVersion",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
