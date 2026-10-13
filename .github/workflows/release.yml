@@ -17,6 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     environment: release
+    env:
+      GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx5g
 
     steps:
       - name: Checkout
