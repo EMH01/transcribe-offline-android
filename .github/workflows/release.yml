@@ -15,7 +15,7 @@ jobs:
   release:
     name: Build and sign release APK
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     environment: release
 
     steps:
@@ -95,6 +95,16 @@ jobs:
       - name: Build signed release APK
         run: gradle :app:assembleRelease --stacktrace
 
+      - name: Verify APK identity and version
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/release/app-release.apk"
+          BADGING="$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | head -n 1)"
+          echo "$BADGING"
+          [[ "$BADGING" == *"com.emh01.transcribeoffline"* ]] || { echo "::error::Unexpected application ID"; exit 1; }
+          [[ "$BADGING" == *"0.4.0-alpha6"* ]] || { echo "::error::Unexpected version; refusing to publish"; exit 1; }
+
       - name: Verify APK signature
         shell: bash
         run: |
@@ -110,7 +120,7 @@ jobs:
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             VERSION="${GITHUB_REF_NAME#v}"
           else
-            VERSION="manual-${GITHUB_RUN_NUMBER}"
+            VERSION="0.4.0-alpha6-build-${GITHUB_RUN_NUMBER}"
           fi
           OUTPUT="TranscribeOffline-${VERSION}-official.apk"
           cp app/build/outputs/apk/release/app-release.apk "$OUTPUT"
@@ -136,6 +146,6 @@ jobs:
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             gh release create "$GITHUB_REF_NAME" "$APK_FILE" "$APK_FILE.sha256" --title "Transcribe Offline $GITHUB_REF_NAME" --generate-notes
           else
-            TEST_TAG="chat-alpha5-build-${GITHUB_RUN_NUMBER}"
-            gh release create "$TEST_TAG" "$APK_FILE" "$APK_FILE.sha256" --target "$GITHUB_SHA" --title "Transcribe Offline 0.4.0-alpha5 (build ${GITHUB_RUN_NUMBER})" --prerelease --notes "Signed test build of the offline conversational Chat branch. Parakeet + Gemma, version 0.4.0-alpha5."
+            TEST_TAG="chat-alpha6-build-${GITHUB_RUN_NUMBER}"
+            gh release create "$TEST_TAG" "$APK_FILE" "$APK_FILE.sha256" --target "$GITHUB_SHA" --title "Transcribe Offline 0.4.0-alpha6 (build ${GITHUB_RUN_NUMBER})" --prerelease --notes "Signed test build of the offline conversational Chat branch. Parakeet + Gemma, version 0.4.0-alpha6."
           fi
