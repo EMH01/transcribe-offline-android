@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - "v*"
+    branches:
+      - feature/offline-chat-assistant
   workflow_dispatch:
 
 permissions:
