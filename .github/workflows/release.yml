@@ -99,6 +99,38 @@ jobs:
       - name: Build signed release APK
         run: gradle :app:assembleRelease --stacktrace
 
+      - name: Report APK size breakdown
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from collections import defaultdict
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          apk = Path("app/build/outputs/apk/release/app-release.apk")
+          groups = defaultdict(lambda: [0, 0])
+          with ZipFile(apk) as archive:
+              for item in archive.infolist():
+                  if item.is_dir():
+                      continue
+                  name = item.filename
+                  if name.endswith((".gguf", ".bin")) and name.startswith("assets/"):
+                      category = "AI models"
+                  elif name.startswith("lib/"):
+                      category = "Native libraries"
+                  elif name.startswith("classes") and name.endswith(".dex"):
+                      category = "DEX code"
+                  elif name.startswith("res/") or name == "resources.arsc":
+                      category = "Android resources"
+                  else:
+                      category = "Other"
+                  groups[category][0] += item.compress_size
+                  groups[category][1] += item.file_size
+          print(f"APK total: {apk.stat().st_size / 1048576:.1f} MiB")
+          for category, (packed, unpacked) in sorted(groups.items(), key=lambda x: -x[1][0]):
+              print(f"{category}: packed {packed / 1048576:.1f} MiB; unpacked {unpacked / 1048576:.1f} MiB")
+          PY
+
       - name: Verify APK signature
         shell: bash
         run: |
