@@ -36,11 +36,15 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
         DEFAULT_GLOSSARY
     }
 
+    private val restoredChatConversations = restoreChatConversations()
+
     private val _uiState = MutableStateFlow(
         TranscribeUiState(
             glossary = glossary,
             llmAvailable = llmAvailable,
-            chatMessages = restoreChatMessages(),
+            chatConversations = restoredChatConversations,
+            activeChatId = restoredChatConversations.firstOrNull()?.id,
+            chatMessages = restoredChatConversations.firstOrNull()?.messages.orEmpty(),
         ),
     )
     val uiState: StateFlow<TranscribeUiState> = _uiState.asStateFlow()
@@ -330,16 +334,18 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
             text = input,
         )
         val conversation = current.chatMessages + userMessage
-        saveChatMessages(conversation)
 
         _uiState.update {
-            it.copy(
+            updateActiveConversation(
+                it.copy(
                 chatInput = "",
-                chatMessages = conversation,
                 isGeneratingChat = true,
                 chatError = null,
+                ),
+                messages = conversation,
             )
         }
+        saveChatConversations(_uiState.value.chatConversations)
 
         viewModelScope.launch {
             runCatching {
@@ -360,20 +366,23 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
                 )
             }.onSuccess { result ->
                 val answer = result.text.trim()
-                _uiState.update {
-                    it.copy(
-                        chatMessages = it.chatMessages + ChatMessage(
-                            role = ChatRole.Assistant,
-                            text = answer.ifBlank {
-                                "No pude generar una respuesta útil. Inténtalo de nuevo."
-                            },
-                            elapsedMs = result.elapsedMs,
+                val assistantMessage = ChatMessage(
+                    role = ChatRole.Assistant,
+                    text = answer.ifBlank {
+                        "No pude generar una respuesta útil. Inténtalo de nuevo."
+                    },
+                    elapsedMs = result.elapsedMs,
+                )
+                _uiState.update { state ->
+                    updateActiveConversation(
+                        state.copy(
+                            isGeneratingChat = false,
+                            chatError = null,
                         ),
-                        isGeneratingChat = false,
-                        chatError = null,
+                        messages = state.chatMessages + assistantMessage,
                     )
                 }
-                saveChatMessages(_uiState.value.chatMessages)
+                saveChatConversations(_uiState.value.chatConversations)
             }.onFailure { error ->
                 _uiState.update {
                     it.copy(
@@ -386,9 +395,40 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    private fun restoreChatMessages(): List<ChatMessage> = runCatching {
-        val stored = preferences.getString(KEY_CHAT_HISTORY, null) ?: return@runCatching emptyList()
+    private fun restoreChatConversations(): List<ChatConversation> = runCatching {
+        val stored = preferences.getString(KEY_CHAT_CONVERSATIONS, null)
+        if (stored == null) {
+            val legacy = restoreLegacyChatMessages()
+            return@runCatching if (legacy.isEmpty()) emptyList() else listOf(
+                ChatConversation(
+                    id = "migrated",
+                    title = conversationTitle(legacy),
+                    updatedAt = System.currentTimeMillis(),
+                    messages = legacy,
+                ),
+            )
+        }
         val array = JSONArray(stored)
+        (0 until array.length()).mapNotNull { index ->
+            val entry = array.optJSONObject(index) ?: return@mapNotNull null
+            val id = entry.optString("id")
+            if (id.isBlank()) return@mapNotNull null
+            val messages = decodeMessages(entry.optJSONArray("messages") ?: JSONArray())
+            ChatConversation(
+                id = id,
+                title = entry.optString("title").ifBlank { "Nueva conversación" },
+                updatedAt = entry.optLong("updatedAt"),
+                messages = messages,
+            )
+        }.sortedByDescending(ChatConversation::updatedAt).take(MAX_SAVED_CONVERSATIONS)
+    }.getOrDefault(emptyList())
+
+    private fun restoreLegacyChatMessages(): List<ChatMessage> = runCatching {
+        val stored = preferences.getString(KEY_CHAT_HISTORY, null) ?: return@runCatching emptyList()
+        decodeMessages(JSONArray(stored))
+    }.getOrDefault(emptyList())
+
+    private fun decodeMessages(array: JSONArray): List<ChatMessage> =
         (0 until array.length()).mapNotNull { index ->
             val entry = array.optJSONObject(index) ?: return@mapNotNull null
             val role = when (entry.optString("role")) {
@@ -397,34 +437,122 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
                 else -> return@mapNotNull null
             }
             val message = entry.optString("text").take(MAX_CHAT_INPUT_CHARS)
-            if (message.isBlank()) null else ChatMessage(role = role, text = message)
+            if (message.isBlank()) null else ChatMessage(
+                role = role,
+                text = message,
+                elapsedMs = entry.optLong("elapsedMs"),
+            )
         }.takeLast(MAX_SAVED_CHAT_MESSAGES)
-    }.getOrDefault(emptyList())
 
-    private fun saveChatMessages(messages: List<ChatMessage>) {
+    private fun saveChatConversations(conversations: List<ChatConversation>) {
         val array = JSONArray()
-        messages.takeLast(MAX_SAVED_CHAT_MESSAGES).forEach { message ->
-            array.put(JSONObject().apply {
-                put("role", if (message.role == ChatRole.User) "user" else "assistant")
-                put("text", message.text)
-            })
-        }
-        preferences.edit().putString(KEY_CHAT_HISTORY, array.toString()).apply()
+        conversations.sortedByDescending(ChatConversation::updatedAt)
+            .take(MAX_SAVED_CONVERSATIONS)
+            .forEach { conversation ->
+                array.put(JSONObject().apply {
+                    put("id", conversation.id)
+                    put("title", conversation.title)
+                    put("updatedAt", conversation.updatedAt)
+                    put("messages", JSONArray().apply {
+                        conversation.messages.takeLast(MAX_SAVED_CHAT_MESSAGES).forEach { message ->
+                            put(JSONObject().apply {
+                                put("role", if (message.role == ChatRole.User) "user" else "assistant")
+                                put("text", message.text)
+                                put("elapsedMs", message.elapsedMs)
+                            })
+                        }
+                    })
+                })
+            }
+        preferences.edit()
+            .putString(KEY_CHAT_CONVERSATIONS, array.toString())
+            .remove(KEY_CHAT_HISTORY)
+            .apply()
     }
 
-    fun clearChat() {
+    private fun updateActiveConversation(
+        state: TranscribeUiState,
+        messages: List<ChatMessage>,
+    ): TranscribeUiState {
+        val id = state.activeChatId ?: "chat-${System.currentTimeMillis()}"
+        val now = System.currentTimeMillis()
+        val updated = ChatConversation(
+            id = id,
+            title = conversationTitle(messages),
+            updatedAt = now,
+            messages = messages.takeLast(MAX_SAVED_CHAT_MESSAGES),
+        )
+        return state.copy(
+            activeChatId = id,
+            chatMessages = updated.messages,
+            chatConversations = (state.chatConversations.filterNot { it.id == id } + updated)
+                .sortedByDescending(ChatConversation::updatedAt)
+                .take(MAX_SAVED_CONVERSATIONS),
+        )
+    }
+
+    private fun conversationTitle(messages: List<ChatMessage>): String =
+        messages.firstOrNull { it.role == ChatRole.User }
+            ?.text
+            ?.replace(Regex("\\s+"), " ")
+            ?.take(52)
+            ?.ifBlank { "Nueva conversación" }
+            ?: "Nueva conversación"
+
+    fun startNewConversation() {
         val current = _uiState.value
         if (current.isGeneratingChat ||
             current.chatVoiceState != ChatVoiceState.Idle
         ) return
 
-        preferences.edit().remove(KEY_CHAT_HISTORY).apply()
         _uiState.update {
             it.copy(
+                activeChatId = null,
                 chatInput = "",
                 chatMessages = emptyList(),
                 chatError = null,
                 chatVoiceProcessingMs = 0L,
+                isChatHistoryVisible = false,
+            )
+        }
+    }
+
+    fun showChatHistory() {
+        if (_uiState.value.isGeneratingChat || _uiState.value.chatVoiceState != ChatVoiceState.Idle) return
+        _uiState.update { it.copy(isChatHistoryVisible = true) }
+    }
+
+    fun hideChatHistory() {
+        _uiState.update { it.copy(isChatHistoryVisible = false) }
+    }
+
+    fun openConversation(id: String) {
+        val conversation = _uiState.value.chatConversations.firstOrNull { it.id == id } ?: return
+        _uiState.update {
+            it.copy(
+                activeChatId = id,
+                chatMessages = conversation.messages,
+                chatInput = "",
+                chatError = null,
+                isChatHistoryVisible = false,
+            )
+        }
+    }
+
+    fun deleteConversation(id: String) {
+        val current = _uiState.value
+        if (current.isGeneratingChat || current.chatVoiceState != ChatVoiceState.Idle) return
+        val remaining = current.chatConversations.filterNot { it.id == id }
+        saveChatConversations(remaining)
+        val next = remaining.firstOrNull()
+        _uiState.update {
+            it.copy(
+                chatConversations = remaining,
+                activeChatId = next?.id,
+                chatMessages = next?.messages.orEmpty(),
+                chatInput = "",
+                chatError = null,
+                isChatHistoryVisible = remaining.isNotEmpty(),
             )
         }
     }
@@ -533,6 +661,13 @@ data class ChatMessage(
     val elapsedMs: Long = 0L,
 )
 
+data class ChatConversation(
+    val id: String,
+    val title: String,
+    val updatedAt: Long,
+    val messages: List<ChatMessage>,
+)
+
 data class TranscribeUiState(
     val mode: WorkspaceMode = WorkspaceMode.Transcribe,
     val stage: TranscribeStage = TranscribeStage.Idle,
@@ -550,6 +685,9 @@ data class TranscribeUiState(
     val improvementError: String? = null,
     val chatInput: String = "",
     val chatMessages: List<ChatMessage> = emptyList(),
+    val chatConversations: List<ChatConversation> = emptyList(),
+    val activeChatId: String? = null,
+    val isChatHistoryVisible: Boolean = false,
     val isGeneratingChat: Boolean = false,
     val chatError: String? = null,
     val chatVoiceState: ChatVoiceState = ChatVoiceState.Idle,
@@ -573,9 +711,11 @@ private data class SpeechPayload(
 
 private const val KEY_GLOSSARY = "local_glossary"
 private const val KEY_CHAT_HISTORY = "local_chat_history"
+private const val KEY_CHAT_CONVERSATIONS = "local_chat_conversations_v2"
 private const val MAX_SAVED_CHAT_MESSAGES = 40
+private const val MAX_SAVED_CONVERSATIONS = 50
 private const val MAX_GLOSSARY_CHARS = 500
 private const val MAX_CHAT_INPUT_CHARS = 3_000
-private const val MAX_CONTEXT_MESSAGES = 6
+private const val MAX_CONTEXT_MESSAGES = 10
 private const val DEFAULT_GLOSSARY =
     "Esther María, Amarilys, Rodovaldo, Guillermina, Alejandro, Martín, Romel, Daniel"
