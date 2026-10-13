@@ -94,6 +94,14 @@ jobs:
           fi
           echo "Stable signing certificate verified."
 
+      - name: Verify source revision before build
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Building commit: $GITHUB_SHA"
+          grep -Fq 'versionCode = 15' app/build.gradle.kts || { echo "::error::Expected alpha6 versionCode 15 missing from checked-out source"; exit 1; }
+          grep -Fq 'versionName = "0.4.0-alpha6"' app/build.gradle.kts || { echo "::error::Expected alpha6 versionName missing from checked-out source"; exit 1; }
+
       - name: Build signed release APK
         run: gradle :app:assembleRelease --stacktrace
 
@@ -105,7 +113,7 @@ jobs:
           BADGING="$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | head -n 1)"
           echo "$BADGING"
           [[ "$BADGING" == *"com.emh01.transcribeoffline"* ]] || { echo "::error::Unexpected application ID"; exit 1; }
-          [[ "$BADGING" == *"0.4.0-alpha6"* ]] || { echo "::error::Unexpected version; refusing to publish"; exit 1; }
+          [[ "$BADGING" == *"versionCode=\'15\'"* && "$BADGING" == *"versionName=\'0.4.0-alpha6\'"* ]] || { echo "::error::Unexpected version; refusing to publish"; exit 1; }
 
       - name: Verify APK signature
         shell: bash
