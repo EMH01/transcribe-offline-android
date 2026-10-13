@@ -26,14 +26,14 @@ The goal is not to reproduce a large cloud AI stack on a low-end phone. It is to
 - **Modular architecture** — the speech stack can later be reused by a fully local LLM assistant.
 - **Reproducible builds** — the model and `whisper.cpp` revision are pinned and verified.
 
-## Current experiment: 0.4.0-alpha5
+## Current experiment: 0.4.0-alpha6
 
-Version **0.4.0-alpha5** keeps the successful **Parakeet TDT 0.6B v3 Q4_0 + Gemma 3 1B IT QAT Q4_0** pairing and changes only the conversational UX.
+Version **0.4.0-alpha6** keeps the successful **Parakeet TDT 0.6B v3 Q4_0 + Gemma 3 1B IT QAT Q4_0** pairing and changes only the conversational UX.
 
 The app now has two clearly separated modes:
 
 - **Transcribe** — record speech, obtain editable local transcription, and optionally use **✨ Improve writing** to clean punctuation and wording without changing the intended meaning.
-- **Chat** — type normally or tap the microphone to dictate a message. Parakeet puts the recognized text into the editable composer first; nothing is sent to Gemma until the user presses send. The last 6 messages provide bounded conversational context.
+- **Chat** — type normally or tap the microphone to dictate a message. Parakeet puts the recognized text into the editable composer first; nothing is sent to Gemma until the user presses send. The last 6 messages provide bounded conversational context. Up to 40 messages are saved locally across app restarts; starting a new conversation clears the saved history.
 
 The existing editable local vocabulary still feeds the local correction layer and the LLM. Parakeet itself does not expose Whisper-style prompt biasing, so this experiment deliberately measures its raw ASR behavior plus the same conservative post-correction already used by the app. The Android manifest still contains no `INTERNET` permission: both speech recognition and text generation run on-device after installation.
 
@@ -71,6 +71,12 @@ Version **0.2.1** established the first performance and reliability baseline:
 - release-signing support for stable Android app identity.
 
 These changes improve both **latency** and **transcription stability** on constrained phones. Version 0.2.1 has been validated as a functional release baseline on real hardware; inference speed still depends heavily on the device CPU, so the app exposes its own performance metrics instead of relying on desktop benchmarks.
+
+## Install and test builds
+
+The signed Android package has application ID `com.emh01.transcribeoffline`, version name `0.4.0-alpha6` and version code `15`. The `Publish signed release` workflow checks the packaged identity and version before publishing a prerelease from `feature/offline-chat-assistant`. The signing certificate is validated against the pinned SHA-256 fingerprint. A green debug CI build alone does **not** mean a signed APK was published. Only install the APK attached to the matching GitHub prerelease; the signed package can update an existing app only if the signing certificate matches.
+
+Chat requires a 64-bit Android device in the current alpha; 32-bit devices may still support transcription but not local Gemma generation. Test on the target device before treating this version as stable. The chat history is stored in local app preferences, not encrypted; do not use it for sensitive content on a shared device.
 
 ## Architecture
 
