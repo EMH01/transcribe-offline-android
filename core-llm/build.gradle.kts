@@ -64,43 +64,43 @@ fun sha256(file: File): String {
     return digest.digest().joinToString("") { "%02x".format(it) }
 }
 
-val qwenModelUrl =
-    "https://huggingface.co/ggml-org/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_0.gguf"
-val qwenModelSha256 =
-    "da2572f16c06133561ce56accaa822216f2391ef4d37fba427801cd6736417d4"
-val qwenModel = layout.projectDirectory.file(
-    "src/main/assets/models/Qwen3-0.6B-Q4_0.gguf",
+val lfmModelUrl =
+    "https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF/resolve/main/LFM2.5-1.2B-Instruct-Q4_K_M.gguf"
+val lfmModelSha256 =
+    "b1b3de114215d9507409a662a501a631095a479a419584e8a2ded6304b19b4f5"
+val lfmModel = layout.projectDirectory.file(
+    "src/main/assets/models/LFM2.5-1.2B-Instruct-Q4_K_M.gguf",
 ).asFile
 
 tasks.register("prepareLocalTextModel") {
     group = "llm"
-    description = "Downloads and verifies Qwen3 0.6B Q4_0 for offline text assistance."
+    description = "Downloads and verifies LFM2.5 1.2B Instruct Q4_K_M for offline text assistance."
 
     doLast {
-        qwenModel.parentFile.mkdirs()
+        lfmModel.parentFile.mkdirs()
 
-        val currentHash = if (qwenModel.exists()) sha256(qwenModel) else null
-        if (currentHash != qwenModelSha256) {
-            if (qwenModel.exists()) qwenModel.delete()
-            logger.lifecycle("Downloading Qwen3 0.6B Q4_0 (about 429 MB)…")
+        val currentHash = if (lfmModel.exists()) sha256(lfmModel) else null
+        if (currentHash != lfmModelSha256) {
+            if (lfmModel.exists()) lfmModel.delete()
+            logger.lifecycle("Downloading LFM2.5 1.2B Instruct Q4_K_M (about 731 MB)…")
 
-            val connection = URI.create(qwenModelUrl).toURL().openConnection().apply {
+            val connection = URI.create(lfmModelUrl).toURL().openConnection().apply {
                 connectTimeout = 30_000
                 readTimeout = 300_000
                 setRequestProperty("User-Agent", "transcribe-offline-android-build")
             }
             connection.getInputStream().buffered().use { input ->
-                qwenModel.outputStream().buffered(1024 * 1024).use { output ->
+                lfmModel.outputStream().buffered(1024 * 1024).use { output ->
                     input.copyTo(output, 1024 * 1024)
                 }
             }
         }
 
-        val verifiedHash = sha256(qwenModel)
-        check(verifiedHash == qwenModelSha256) {
-            "Qwen model checksum mismatch. Expected $qwenModelSha256, got $verifiedHash"
+        val verifiedHash = sha256(lfmModel)
+        check(verifiedHash == lfmModelSha256) {
+            "LFM model checksum mismatch. Expected $lfmModelSha256, got $verifiedHash"
         }
-        logger.lifecycle("Qwen3 0.6B Q4_0 verified and ready for APK packaging.")
+        logger.lifecycle("LFM2.5 1.2B Instruct Q4_K_M verified and ready for APK packaging.")
     }
 }
 

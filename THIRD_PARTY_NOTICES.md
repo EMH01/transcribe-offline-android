@@ -23,17 +23,17 @@ Project: https://github.com/ggml-org/llama.cpp
 
 License: MIT.
 
-## Gemma 3 1B IT QAT Q4_0
+## LFM2.5 1.2B Instruct Q4_K_M
 
-The alpha2 writing assistant uses `ggml-org/gemma-3-1b-it-qat-GGUF` from Hugging Face.
+The alpha12 local assistant uses `LiquidAI/LFM2.5-1.2B-Instruct-GGUF` from Hugging Face.
 
-Model file: `gemma-3-1b-it-qat-Q4_0.gguf`
+Model file: `LFM2.5-1.2B-Instruct-Q4_K_M.gguf`
 
 SHA-256:
 
-`ef60e4e91a738c99ae9976b050657dfe68a4007a0ccca121b55ec0c413dccd58`
+`b1b3de114215d9507409a662a501a631095a479a419584e8a2ded6304b19b4f5`
 
-Terms: Gemma Terms of Use.
+Terms: LFM Open License v1.0. See the upstream model repository for the license text.
 
 
 ## Parakeet runtime

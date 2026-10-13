@@ -21,7 +21,7 @@ class LocalLlmTextEngine(
 ) : TextImprovementEngine {
     private val appContext = context.applicationContext
     private val dispatcher = Executors.newSingleThreadExecutor { runnable ->
-        Thread(runnable, "qwen-text-generation").apply {
+        Thread(runnable, "lfm-text-generation").apply {
             priority = Thread.NORM_PRIORITY - 1
         }
     }.asCoroutineDispatcher()
@@ -48,7 +48,7 @@ class LocalLlmTextEngine(
         val improved = chunks.joinToString(separator = "\n\n") { chunk ->
             val raw = LlamaNative.generate(
                 modelPtr = ptr,
-                userPrompt = "${buildImprovementPrompt(chunk, glossary)}\n/no_think",
+                userPrompt = buildImprovementPrompt(chunk, glossary),
                 maxTokens = MAX_IMPROVEMENT_TOKENS,
                 threadCount = preferredThreadCount(),
             )
@@ -80,7 +80,7 @@ class LocalLlmTextEngine(
         val ptr = ensureModel()
         val raw = LlamaNative.generate(
             modelPtr = ptr,
-            userPrompt = "${buildDraftPrompt(cleanInstruction, glossary)}\n/no_think",
+            userPrompt = buildDraftPrompt(cleanInstruction, glossary),
             maxTokens = MAX_DRAFT_TOKENS,
             threadCount = preferredThreadCount(),
         )
@@ -115,9 +115,6 @@ class LocalLlmTextEngine(
         val contents = buildList {
             add(buildChatSystemPrompt())
             addAll(cleanMessages.map(TextChatMessage::text))
-            if (lastOrNull() != null) {
-                this[lastIndex] = "${last()}\n/no_think"
-            }
         }.toTypedArray()
         val raw = LlamaNative.generateConversation(
             modelPtr = ptr,
@@ -168,7 +165,7 @@ class LocalLlmTextEngine(
         if (modelPtr == 0L) {
             val modelFile = ensureModelFile()
             modelPtr = LlamaNative.loadModel(modelFile.absolutePath)
-            check(modelPtr != 0L) { "No se pudo cargar Qwen3 0.6B en este dispositivo." }
+            check(modelPtr != 0L) { "No se pudo cargar LFM2.5 1.2B en este dispositivo." }
         }
         return modelPtr
     }
@@ -198,12 +195,12 @@ class LocalLlmTextEngine(
         }
 
         check(temporary.length() > MIN_EXPECTED_MODEL_BYTES) {
-            "La copia local de Qwen3 está incompleta."
+            "La copia local de LFM está incompleta."
         }
 
         if (target.exists()) target.delete()
         check(temporary.renameTo(target)) {
-            "No se pudo preparar Qwen3 para la asistencia local."
+            "No se pudo preparar LFM para la asistencia local."
         }
         return target
     }
@@ -257,6 +254,8 @@ class LocalLlmTextEngine(
             Instrucciones:
             - Genera exactamente una respuesta al último mensaje y detente. Nunca simules
               mensajes futuros del usuario ni escribas varias respuestas alternativas.
+            - Trata los mensajes cortos como "sí", "no", "cómo", "qué" o "por qué"
+              como respuestas a tu turno anterior. No reinicies el saludo ni la conversación.
             - Usa todos los datos de los turnos anteriores para continuar la conversación.
             - Responde a la petición más reciente sin repetir preguntas ya respondidas.
             - Si el usuario aporta los datos que pediste, realiza la tarea de inmediato.
@@ -356,11 +355,11 @@ class LocalLlmTextEngine(
 
     companion object {
         const val DEFAULT_MODEL_ASSET =
-            "models/Qwen3-0.6B-Q4_0.gguf"
+            "models/LFM2.5-1.2B-Instruct-Q4_K_M.gguf"
 
         private const val MODEL_FILE_NAME =
-            "Qwen3-0.6B-Q4_0.gguf"
-        private const val MIN_EXPECTED_MODEL_BYTES = 400_000_000L
+            "LFM2.5-1.2B-Instruct-Q4_K_M.gguf"
+        private const val MIN_EXPECTED_MODEL_BYTES = 700_000_000L
         private const val MAX_CHUNK_CHARS = 2_200
         private const val MAX_IMPROVEMENT_TOKENS = 512
         private const val MAX_DRAFT_TOKENS = 768
@@ -372,6 +371,7 @@ class LocalLlmTextEngine(
         private const val MAX_INSTRUCTION_CHARS = 3_000
         private val LEGACY_MODEL_FILES = listOf(
             "gemma-3-1b-it-qat-Q4_0.gguf",
+            "Qwen3-0.6B-Q4_0.gguf",
             "qwen2.5-0.5b-instruct-q4_0.gguf",
             "qwen2.5-0.5b-instruct-q4_k_m.gguf",
         )

@@ -163,7 +163,21 @@ jstring generate_from_formatted_prompt(
     llama_sampler_chain_params sampler_params = llama_sampler_chain_default_params();
     sampler_params.no_perf = true;
     llama_sampler * sampler = llama_sampler_chain_init(sampler_params);
-    llama_sampler_chain_add(sampler, llama_sampler_init_greedy());
+    // Greedy decoding made short conversational turns collapse into repeated
+    // stock answers. Keep the sampler conservative but allow alternatives.
+    llama_sampler_chain_add(sampler, llama_sampler_init_top_k(50));
+    llama_sampler_chain_add(
+        sampler,
+        llama_sampler_init_penalties(
+            llama_vocab_n_tokens(vocab),
+            64,
+            1.05f,
+            0.0f,
+            0.0f
+        )
+    );
+    llama_sampler_chain_add(sampler, llama_sampler_init_temp(0.1f));
+    llama_sampler_chain_add(sampler, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
     llama_batch_ext * batch = llama_batch_ext_init(ctx);
     if (batch == nullptr) {
         llama_sampler_free(sampler);

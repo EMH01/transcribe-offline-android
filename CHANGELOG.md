@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0-alpha12 — LFM conversational benchmark
+
+- Replace the chat model with **LFM2.5 1.2B Instruct Q4_K_M**.
+- Replace greedy decoding with conservative temperature, top-k and repetition-penalty sampling.
+- Keep Parakeet transcription and its visual feedback unchanged.
+- Compact the Loquia header so the Chat workspace starts higher on screen.
+
 ## 0.4.0-alpha11 — Loquia identity and conversational reliability
 
 - Rename the product to **Loquia**, a private, local and offline voice assistant.

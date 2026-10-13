@@ -235,22 +235,18 @@ private fun TranscribeScreen(
     onGlossaryRequested: () -> Unit,
 ) {
     val context = LocalContext.current
-    @Suppress("DEPRECATION")
-    val installedVersion = remember(context) {
-        context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "desconocida"
-    }
-
     val keyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             if (!keyboardVisible || state.mode != WorkspaceMode.Chat) Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .statusBarsPadding()
-                    .padding(horizontal = 24.dp, vertical = 12.dp),
+                    .padding(start = 24.dp, top = 2.dp, end = 24.dp, bottom = 6.dp),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -269,7 +265,7 @@ private fun TranscribeScreen(
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
-                            text = "Asistente de voz · privado · local · sin conexión · v$installedVersion",
+                            text = "Privado · local · sin conexión",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -280,7 +276,7 @@ private fun TranscribeScreen(
                     }
                 }
 
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(4.dp))
                 ModeTabs(
                     selected = state.mode,
                     onModeChange = onModeChange,
@@ -456,7 +452,7 @@ private fun AssistantContent(
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    text = "Parakeet + Qwen3 0.6B · local",
+                    text = "Parakeet + LFM2.5 1.2B · local",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -775,7 +771,7 @@ private fun ChatBubble(message: ChatMessage) {
                 }
                 if (!isUser && message.elapsedMs > 0L) {
                     Text(
-                        text = "Qwen3 0.6B · %.1f s".format(message.elapsedMs / 1000f),
+                        text = "LFM2.5 1.2B · %.1f s".format(message.elapsedMs / 1000f),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1046,7 +1042,7 @@ private fun ResultContent(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "Qwen3 0.6B · %.1f s".format(state.improvementMs / 1000f),
+                    text = "LFM2.5 1.2B · %.1f s".format(state.improvementMs / 1000f),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
