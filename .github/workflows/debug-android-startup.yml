@@ -28,7 +28,7 @@ jobs:
           for name in ("ic_action_microphone.png", "ic_action_send.png"):
               path = Path("app/src/main/res/drawable-nodpi") / name
               data = path.read_bytes()
-              assert data.startswith(b"\\x89PNG\\r\\n\\x1a\\n"), f"{name}: invalid PNG signature"
+              assert data.startswith(bytes.fromhex("89504e470d0a1a0a")), f"{name}: invalid PNG signature"
               with Image.open(path) as image:
                   assert image.format == "PNG", f"{name}: expected PNG, got {image.format}"
                   image.verify()
