@@ -625,6 +625,10 @@ private fun AssistantContent(
                 modifier = Modifier.size(54.dp),
                 shape = CircleShape,
                 contentPadding = PaddingValues(0.dp),
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = Color.Transparent,
+                    disabledContainerColor = Color.Transparent,
+                ),
                 enabled = state.chatVoiceState != ChatVoiceState.Processing &&
                     !state.isGeneratingChat,
             ) {
@@ -634,6 +638,7 @@ private fun AssistantContent(
                     ActionIcon(
                         drawable = R.drawable.ic_action_microphone,
                         description = "Dictar mensaje",
+                        size = 54.dp,
                     )
                 }
             }
@@ -643,6 +648,10 @@ private fun AssistantContent(
                 modifier = Modifier.size(54.dp),
                 shape = CircleShape,
                 contentPadding = PaddingValues(0.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Transparent,
+                    disabledContainerColor = Color.Transparent,
+                ),
                 enabled = state.chatInput.isNotBlank() &&
                     !state.isGeneratingChat &&
                     state.chatVoiceState == ChatVoiceState.Idle,
@@ -650,6 +659,7 @@ private fun AssistantContent(
                 ActionIcon(
                     drawable = R.drawable.ic_action_send,
                     description = "Enviar mensaje",
+                    size = 54.dp,
                 )
             }
         }
@@ -825,11 +835,15 @@ private fun IdleContent(onRecordRequested: () -> Unit) {
             modifier = Modifier.size(116.dp),
             shape = CircleShape,
             contentPadding = PaddingValues(0.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color.Transparent,
+                disabledContainerColor = Color.Transparent,
+            ),
         ) {
             ActionIcon(
                 drawable = R.drawable.ic_action_microphone,
                 description = "Iniciar transcripción",
-                size = 88.dp,
+                size = 116.dp,
             )
         }
         Spacer(Modifier.height(18.dp))
