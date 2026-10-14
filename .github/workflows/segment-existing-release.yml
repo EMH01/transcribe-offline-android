@@ -1,0 +1,101 @@
+name: Add segmented download to existing release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Existing release tag (leave blank for latest)"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: segmented-release-assets
+  cancel-in-progress: false
+
+jobs:
+  segment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Install 7-Zip
+        run: sudo apt-get update && sudo apt-get install -y p7zip-full
+
+      - name: Download the existing signed APK
+        id: release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REQUESTED_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          TAG="$REQUESTED_TAG"
+          if [[ -z "$TAG" ]]; then
+            TAG="$(gh release view --json tagName --jq .tagName)"
+          fi
+          gh release view "$TAG" >/dev/null
+          VERSION="${TAG#v}"
+          APK="Loquia-${VERSION}-official.apk"
+          gh release download "$TAG" --pattern "$APK" --dir .
+          gh release download "$TAG" --pattern "$APK.sha256" --dir .
+          sha256sum -c "$APK.sha256"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "apk=$APK" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Create independently downloadable 100 MiB volumes
+        shell: bash
+        env:
+          APK: ${{ steps.release.outputs.apk }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          ARCHIVE="Loquia-${VERSION}-offline-download.7z"
+          7z a -t7z -mx=0 -v100m "$ARCHIVE" "$APK"
+          ls -lh "${ARCHIVE}".*
+          sha256sum "${ARCHIVE}".* > "Loquia-${VERSION}-parts.sha256"
+          mkdir -p verify
+          (cd verify && 7z x "../${ARCHIVE}.001")
+          cmp "$APK" "verify/$APK"
+          cat > "Loquia-${VERSION}-HOW-TO-INSTALL.txt" <<EOF
+          LOQUIA ${VERSION} - DOWNLOAD IN PARTS
+
+          1. Download EVERY file ending in .7z.001, .7z.002, etc. into the SAME folder.
+          2. On Android, open the FIRST part (.7z.001) in a file manager
+             that supports multipart 7z archives (for example, ZArchiver).
+          3. Extract the APK. The other parts will be read automatically.
+          4. Install the extracted Loquia-${VERSION}-official.apk.
+
+          If a download fails, retry only that part.
+          Do not rename the parts. You need sufficient free space for the
+          downloaded parts and the extracted APK.
+          The original single-file signed APK remains available in this release.
+          EOF
+
+      - name: Add volumes to the existing release without replacing the APK
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ steps.release.outputs.tag }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          ARCHIVE="Loquia-${VERSION}-offline-download.7z"
+          shopt -s nullglob
+          PARTS=("${ARCHIVE}".*)
+          if (( ${#PARTS[@]} == 0 )); then
+            echo "::error::No archive parts were created"
+            exit 1
+          fi
+          EXISTING="$(gh release view "$TAG" --json assets --jq '.assets[].name')"
+          for part in "${PARTS[@]}" "Loquia-${VERSION}-parts.sha256" "Loquia-${VERSION}-HOW-TO-INSTALL.txt"; do
+            if grep -Fxq "$part" <<< "$EXISTING"; then
+              echo "::error::Asset $part already exists; refusing to overwrite release files."
+              exit 1
+            fi
+          done
+          gh release upload "$TAG" "${PARTS[@]}" "Loquia-${VERSION}-parts.sha256" "Loquia-${VERSION}-HOW-TO-INSTALL.txt"
