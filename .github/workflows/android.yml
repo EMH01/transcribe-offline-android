@@ -3,9 +3,20 @@ name: Android CI
 on:
   push:
     branches: [ main ]
+    paths-ignore:
+      - "*.md"
+      - "docs/**"
   pull_request:
     branches: [ main ]
   workflow_dispatch:
+
+# Only the newest push to a branch needs CI; do not cancel manual debug or releases.
+concurrency:
+  group: android-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -34,12 +45,14 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Build debug APK
-        run: gradle :app:assembleDebug --stacktrace
+      # CI checks Android/Kotlin/native compilation and resource packaging.
+      # Model-download tasks remain mandatory for official signed releases.
+      - name: Build lightweight debug APK (without bundled AI models)
+        run: |
+          gradle :app:assembleDebug \
+            -x :app:prepareParakeetModel \
+            -x :core-llm:prepareLocalTextModel \
+            --stacktrace
 
-      - name: Upload APK
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: loquia-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+      # Deliberately do not upload this APK: it lacks the offline models and
+      # must not be confused with a runnable, full-featured release.
