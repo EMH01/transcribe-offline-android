@@ -255,7 +255,7 @@ private fun TranscribeScreen(
                         modifier = Modifier.size(42.dp),
                     )
                     Spacer(Modifier.width(10.dp))
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "Loquia",
                             style = MaterialTheme.typography.headlineSmall,
@@ -267,15 +267,13 @@ private fun TranscribeScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                }
-
-                // Keep the glossary action in its own row so it cannot squeeze
-                // the app name or split words into individual letters.
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                ) {
-                    TextButton(onClick = onGlossaryRequested) {
+                    Spacer(Modifier.width(8.dp))
+                    // Fixed room for two complete words; the subtitle wraps if needed.
+                    TextButton(
+                        onClick = onGlossaryRequested,
+                        modifier = Modifier.width(116.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
+                    ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
                                 text = "Vocabulario",
