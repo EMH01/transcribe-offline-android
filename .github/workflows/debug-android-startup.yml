@@ -18,35 +18,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Verify button image files and decode them
+      - name: Verify action PNG resources
         run: |
           python -m pip install --disable-pip-version-check Pillow
           python - <<'PY'
           from pathlib import Path
           from PIL import Image
           import hashlib
-          files = [
-              Path("app/src/main/res/drawable-nodpi/ic_action_microphone.jpg"),
-              Path("app/src/main/res/drawable-nodpi/ic_action_send.jpg"),
-          ]
-          failed = False
-          for path in files:
+          for name in ("ic_action_microphone.png", "ic_action_send.png"):
+              path = Path("app/src/main/res/drawable-nodpi") / name
               data = path.read_bytes()
-              print(f"{path.name}: {len(data)} bytes, SHA-256={hashlib.sha256(data).hexdigest()}, magic={data[:16].hex()}")
-              try:
-                  with Image.open(path) as img:
-                      print(f"  detected format={img.format}, size={img.size}, mode={img.mode}")
-                      if img.format != "JPEG":
-                          raise ValueError("File extension is .jpg but actual content is not JPEG")
-                      img.verify()
-                  with Image.open(path) as img:
-                      img.load()
-                      print("  Full pixel decoding: OK")
-              except Exception as exc:
-                  failed = True
-                  print(f"::error file={path}::Icon cannot be decoded as JPEG: {type(exc).__name__}: {exc}")
-          if failed:
-              raise SystemExit("One or more button icons are invalid")
+              assert data.startswith(b"\\x89PNG\\r\\n\\x1a\\n"), f"{name}: invalid PNG signature"
+              with Image.open(path) as image:
+                  assert image.format == "PNG", f"{name}: expected PNG, got {image.format}"
+                  image.verify()
+              with Image.open(path) as image:
+                  image.load()
+                  print(f"{name}: valid PNG, {image.size}, mode {image.mode}, {len(data)} bytes, SHA256 {hashlib.sha256(data).hexdigest()}")
           PY
 
       - name: Set up JDK 17
