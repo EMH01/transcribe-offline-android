@@ -1,7 +1,6 @@
 package com.emh01.transcribe.ui
 
 import android.Manifest
-import android.graphics.BitmapFactory
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.SystemClock
@@ -62,7 +61,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -831,34 +829,12 @@ private fun ActionIcon(
     description: String,
     size: androidx.compose.ui.unit.Dp = 32.dp,
 ) {
-    // Use bounded dimensions inside a Material button. fillMaxSize() here
-    // can propagate unsuitable parent constraints during Compose measurement.
-    // Decode outside composable image loading so an invalid JPEG cannot crash startup.
-    // remember's calculation is ordinary Kotlin and may safely catch decode errors.
-    val context = LocalContext.current
-    val bitmap = remember(context, drawable) {
-        try {
-            BitmapFactory.decodeResource(context.resources, drawable)
-        } catch (_: RuntimeException) {
-            null
-        }
-    }
-    if (bitmap != null) {
-        Image(
-            bitmap = bitmap.asImageBitmap(),
-            contentDescription = description,
-            contentScale = ContentScale.Fit,
-            modifier = Modifier.size(size),
-        )
-    } else {
-        Text(
-            text = if (drawable == R.drawable.ic_action_microphone) "🎙" else "➤",
-            modifier = Modifier.size(size),
-            fontSize = (size.value * 0.72f).sp,
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onPrimary,
-        )
-    }
+    Image(
+        painter = painterResource(id = drawable),
+        contentDescription = description,
+        contentScale = ContentScale.Fit,
+        modifier = Modifier.size(size),
+    )
 }
 
 @Composable
