@@ -58,13 +58,15 @@ jobs:
           disk-size: 8G
           disable-animations: true
           script: |
-            set -euo pipefail
+            set -eu
             mkdir -p startup-diagnostics
+            # Capture logs even if installation or startup fails.
+            trap 'adb logcat -d -v threadtime > startup-diagnostics/logcat.txt 2>&1 || true; adb shell dumpsys activity activities > startup-diagnostics/activities.txt 2>&1 || true' EXIT
             PACKAGE=com.emh01.transcribeoffline.smoke
             APK=app/build/outputs/apk/smoke/app-smoke.apk
-            adb install -r "$APK"
+            adb install -r "$APK" 2>&1 | tee startup-diagnostics/install.txt
             adb logcat -c
-            adb shell am start -W -n "$PACKAGE/com.emh01.transcribe.MainActivity"
+            adb shell am start -W -n "$PACKAGE/com.emh01.transcribe.MainActivity" 2>&1 | tee startup-diagnostics/start.txt
             sleep 12
             adb logcat -d -v threadtime > startup-diagnostics/logcat.txt
             adb shell dumpsys activity activities > startup-diagnostics/activities.txt
