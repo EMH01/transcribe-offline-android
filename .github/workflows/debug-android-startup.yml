@@ -1,0 +1,89 @@
+name: Debug Android startup
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Emulator startup test (release optimizations)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx5g
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4.0.4
+
+      - name: Install Android packages
+        run: |
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" "cmake;3.22.1" "ndk;27.0.12077973"
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Build release-optimized smoke APK
+        run: gradle :app:assembleSmoke --stacktrace
+
+      - name: Enable KVM acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Start emulator and verify Loquia startup
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          cores: 4
+          ram-size: 4096M
+          heap-size: 512M
+          disk-size: 8G
+          disable-animations: true
+          script: |
+            set -euo pipefail
+            mkdir -p startup-diagnostics
+            PACKAGE=com.emh01.transcribeoffline.smoke
+            APK=app/build/outputs/apk/smoke/app-smoke.apk
+            adb install -r "$APK"
+            adb logcat -c
+            adb shell am start -W -n "$PACKAGE/com.emh01.transcribe.MainActivity"
+            sleep 12
+            adb logcat -d -v threadtime > startup-diagnostics/logcat.txt
+            adb shell dumpsys activity activities > startup-diagnostics/activities.txt
+            if ! adb shell pidof "$PACKAGE" > startup-diagnostics/pid.txt; then
+              echo "::error::Loquia exited during startup; inspect the uploaded Logcat"
+              grep -E -A 25 'FATAL EXCEPTION|AndroidRuntime|Process: com.emh01.transcribeoffline.smoke' startup-diagnostics/logcat.txt || true
+              exit 1
+            fi
+            if grep -E -A 12 'FATAL EXCEPTION' startup-diagnostics/logcat.txt | grep -Fq "$PACKAGE"; then
+              echo "::error::Detected Loquia FATAL EXCEPTION in Logcat"
+              exit 1
+            fi
+            echo "Loquia remained running after startup."
+
+      - name: Upload startup diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: loquia-emulator-startup-diagnostics
+          path: startup-diagnostics/
+          if-no-files-found: warn
+
