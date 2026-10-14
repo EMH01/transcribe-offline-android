@@ -267,9 +267,27 @@ private fun TranscribeScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Spacer(Modifier.weight(1f))
+                }
+
+                // Keep the glossary action in its own row so it cannot squeeze
+                // the app name or split words into individual letters.
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
                     TextButton(onClick = onGlossaryRequested) {
-                        Text("Vocabulario especial")
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "Vocabulario",
+                                style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1,
+                            )
+                            Text(
+                                text = "especial",
+                                style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1,
+                            )
+                        }
                     }
                 }
 
