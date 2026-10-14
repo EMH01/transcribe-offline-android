@@ -8,7 +8,7 @@
 .cxx/
 .externalNativeBuild/
 
-# The model is fetched and bundled at build time; do not commit the 32 MB binary.
+# Parakeet weights are downloaded and bundled during the build; do not commit model binaries.
 app/src/main/assets/models/*.bin
 !app/src/main/assets/models/.gitkeep
 
