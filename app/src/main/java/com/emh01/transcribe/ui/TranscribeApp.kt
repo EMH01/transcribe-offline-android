@@ -811,6 +811,7 @@ private fun IdleContent(onRecordRequested: () -> Unit) {
             ActionIcon(
                 drawable = R.drawable.ic_action_microphone,
                 description = "Iniciar transcripción",
+                size = 88.dp,
             )
         }
         Spacer(Modifier.height(18.dp))
@@ -826,12 +827,15 @@ private fun IdleContent(onRecordRequested: () -> Unit) {
 private fun ActionIcon(
     @androidx.annotation.DrawableRes drawable: Int,
     description: String,
+    size: androidx.compose.ui.unit.Dp = 32.dp,
 ) {
+    // Use bounded dimensions inside a Material button. fillMaxSize() here
+    // can propagate unsuitable parent constraints during Compose measurement.
     Image(
         painter = painterResource(drawable),
         contentDescription = description,
-        contentScale = ContentScale.Crop,
-        modifier = Modifier.fillMaxSize(),
+        contentScale = ContentScale.Fit,
+        modifier = Modifier.size(size),
     )
 }
 
