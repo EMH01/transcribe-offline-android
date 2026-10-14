@@ -831,12 +831,29 @@ private fun ActionIcon(
 ) {
     // Use bounded dimensions inside a Material button. fillMaxSize() here
     // can propagate unsuitable parent constraints during Compose measurement.
-    Image(
-        painter = painterResource(drawable),
-        contentDescription = description,
-        contentScale = ContentScale.Fit,
-        modifier = Modifier.size(size),
-    )
+    // Bitmap decoding can fail for malformed or unsupported image resources.
+    // Never let a decorative action icon crash the entire application.
+    val painter = try {
+        painterResource(drawable)
+    } catch (_: RuntimeException) {
+        null
+    }
+    if (painter != null) {
+        Image(
+            painter = painter,
+            contentDescription = description,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.size(size),
+        )
+    } else {
+        Text(
+            text = if (drawable == R.drawable.ic_action_microphone) "🎙" else "➤",
+            modifier = Modifier.size(size),
+            fontSize = (size.value * 0.72f).sp,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onPrimary,
+        )
+    }
 }
 
 @Composable
