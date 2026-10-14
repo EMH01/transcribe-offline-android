@@ -49,6 +49,14 @@ android {
                 "proguard-rules.pro",
             )
         }
+        // Installable release-equivalent build for automated emulator startup checks.
+        // Uses only the local debug key; it must never be distributed as an official APK.
+        create("smoke") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            applicationIdSuffix = ".smoke"
+            matchingFallbacks += listOf("release")
+        }
     }
 
     buildFeatures {
