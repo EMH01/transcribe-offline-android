@@ -57,6 +57,14 @@ android {
             applicationIdSuffix = ".smoke"
             matchingFallbacks += listOf("release")
         }
+        // Diagnostic variant matching the older non-minified official release.
+        create("smokePlain") {
+            initWith(getByName("smoke"))
+            isMinifyEnabled = false
+            isShrinkResources = false
+            applicationIdSuffix = ".smokeplain"
+            matchingFallbacks += listOf("release")
+        }
     }
 
     buildFeatures {
