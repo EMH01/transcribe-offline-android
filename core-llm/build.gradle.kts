@@ -14,8 +14,7 @@ android {
         minSdk = 26
 
         ndk {
-            // The local LLM is intentionally 64-bit only. The rest of the app
-            // keeps its existing 32-bit Whisper support.
+            // The local LLM is intentionally 64-bit only.
             abiFilters += listOf("arm64-v8a")
         }
 
