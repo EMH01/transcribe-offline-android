@@ -262,7 +262,7 @@ private fun TranscribeScreen(
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
-                            text = "Asistente de voz privado, local y sin conexión",
+                            text = "Asistente privado, local y sin conexión",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
