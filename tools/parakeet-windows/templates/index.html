@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Loquia · Transcripción de archivos (local)</title>
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color-scheme:light dark}
+body{max-width:760px;margin:5vh auto;padding:0 20px;line-height:1.5}
+main{border:1px solid #8886;border-radius:18px;padding:28px}
+h1{margin-top:0}button{padding:12px 18px;border-radius:9px;cursor:pointer;margin:8px 8px 8px 0}
+input{max-width:100%}textarea{box-sizing:border-box;width:100%;min-height:270px;padding:14px;border-radius:9px;font:inherit}
+.muted{opacity:.75}#status{min-height:1.6em}label{display:block;margin-bottom:12px}
+</style></head><body><main>
+<h1>Transcribir un archivo</h1>
+<p class="muted">Parakeet TDT 0.6B v3 Q4_0 · procesamiento en tu ordenador, sin nube.</p>
+<form id="form"><label for="audio">Selecciona un audio (máximo 250 MB)</label>
+<input id="audio" name="audio" type="file" accept=".wav,.mp3,.m4a,.aac,.ogg,.flac,.opus,.wma,.mp4,audio/*" required>
+<div><button id="run" type="submit">Transcribir</button></div></form>
+<p id="status" role="status" aria-live="polite"></p>
+<label for="result">Resultado</label><textarea id="result" spellcheck="false" placeholder="Aquí aparecerá la transcripción..." readonly></textarea>
+<div><button id="copy" type="button">Copiar texto</button><button id="download" type="button">Guardar TXT</button></div>
+</main><script>
+const form=document.getElementById('form'),run=document.getElementById('run'),status=document.getElementById('status'),result=document.getElementById('result');
+form.addEventListener('submit',async e=>{
+e.preventDefault();const file=document.getElementById('audio').files[0];if(!file)return;
+if(file.size>250*1024*1024){status.textContent='El archivo supera 250 MB.';return}
+run.disabled=true;result.value='';status.textContent='Procesando localmente… Puede tardar varios minutos.';
+try{const data=new FormData();data.append('audio',file);const response=await fetch('/transcribe',{method:'POST',body:data});const json=await response.json();
+if(!response.ok)throw Error(json.error||'Error desconocido');result.value=json.text;status.textContent='Transcripción completada.';
+}catch(err){status.textContent='Error: '+err.message}finally{run.disabled=false}
+});
+document.getElementById('copy').onclick=async()=>{if(result.value){await navigator.clipboard.writeText(result.value);status.textContent='Texto copiado.'}};
+document.getElementById('download').onclick=()=>{if(!result.value)return;const url=URL.createObjectURL(new Blob([result.value],{type:'text/plain;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='transcripcion.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
+</script></body></html>
